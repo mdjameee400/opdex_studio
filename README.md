@@ -57,17 +57,26 @@ Opdex Studio integrates playful growth mechanics designed to maximize engagement
 
 ---
 
-## 🛠 Quickstart
+## 🤝 How to Contribute
 
-```bash
-# Clone the repository
-git clone https://github.com/mdjameee400/opdex_studio.git
+We welcome creative developers, 3D artists, and shader enthusiasts to submit new interactive artifacts to the Opdex stack!
 
-# Install dependencies
-npm install
+### Adding Your 3D Artifact:
+1. **Fork & Branch**:
+   ```bash
+   git checkout -b feature/new-artifact
+   ```
+2. **Drop Your File**:
+   Place your standalone HTML5 / WebGL / Three.js file into:
+   ```text
+   elements/my_artifact.html
+   public/elements/my_artifact.html
+   ```
+3. **Add Preview & Register**:
+   - Add a snapshot to `public/elements/thumbnails/my_artifact.png`
+   - Register your artifact metadata and UID in `src/data/projects.ts`
+4. **Open a PR**:
+   Run `npm run build` to verify, commit your work, and open a Pull Request!
 
-# Run the live studio
-npm run dev
-```
+> **Looking for ideas?** We love WebGL shaders, retro console simulations, tactile sound generators, and physics toys.
 
-Open [http://localhost:3000](http://localhost:3000) to launch Opdex Studio.
