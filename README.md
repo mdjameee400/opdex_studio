@@ -1,4 +1,4 @@
-# 🪐 Opdex Studio · 3D Artifacts & Zero Gravity Interface
+# <img src="public/logo.svg" width="36" height="36" align="center" /> Opdex Studio · 3D Artifacts & Zero Gravity Interface
 
 <p align="center">
   <img src="public/hero_preview.png" alt="Opdex Studio Live UI" width="100%" style="border-radius: 16px; border: 3px solid #18181B; box-shadow: 6px 6px 0px #18181B;" />

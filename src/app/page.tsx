@@ -225,16 +225,21 @@ export default function OpdexLandingPage() {
       <header className="fixed top-0 left-0 w-full z-50 bg-[#FAF5EB]/90 backdrop-blur-md border-b-2 border-brutal-black">
         <div className="h-20 w-full px-margin-mobile md:px-margin flex items-center justify-between">
           <a
-            className="flex items-center gap-space-sm bg-cream-card px-space-md py-space-sm rounded-2xl border-2 border-brutal-black shadow-brutal transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5 active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_#18181B]"
+            className="group flex items-center gap-space-sm bg-cream-card px-space-md py-space-sm rounded-2xl border-2 border-brutal-black shadow-brutal transition-transform hover:-translate-x-0.5 hover:-translate-y-0.5 active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0px_#18181B]"
             href="#"
             onClick={() => playPop(500)}
           >
-            <div className="w-9 h-9 rounded-xl bg-pastel-yellow border-2 border-brutal-black flex items-center justify-center text-brutal-black shadow-brutal-sm">
-              <span className="material-symbols-outlined text-headline-sm">local_fire_department</span>
+            <div className="w-10 h-10 rounded-xl bg-pastel-yellow border-2 border-brutal-black flex items-center justify-center shadow-brutal-sm overflow-hidden p-1 group-hover:rotate-6 transition-transform">
+              <img src="/logo.svg" alt="Opdex Studio Logo" className="w-full h-full object-contain" />
             </div>
-            <span className="font-headline-sm text-lg md:text-xl font-bold tracking-tight text-brutal-black">
-              Opdex Studio
-            </span>
+            <div className="flex flex-col">
+              <span className="font-headline-sm text-lg md:text-xl font-bold tracking-tight text-brutal-black leading-none">
+                Opdex Studio
+              </span>
+              <span className="font-mono text-[10px] text-zinc-600 font-bold uppercase tracking-wider mt-0.5">
+                Zero-G Lab
+              </span>
+            </div>
           </a>
 
           <div className="flex items-center gap-space-sm">
@@ -770,9 +775,14 @@ export default function OpdexLandingPage() {
       {/* FOOTER */}
       <footer className="w-full bg-[#FAF5EB] py-space-lg border-t-2 border-brutal-black">
         <div className="w-full px-margin-mobile md:px-margin flex flex-col sm:flex-row items-center justify-between gap-space-md">
-          <p className="font-body-sm text-xs md:text-sm text-zinc-700 font-semibold text-center sm:text-left">
-            © {currentYear} Opdex Studio. Built with pastel neo-brutal physics.
-          </p>
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-pastel-yellow border border-brutal-black flex items-center justify-center p-0.5 shadow-brutal-sm">
+              <img src="/logo.svg" alt="Opdex Logo" className="w-full h-full object-contain" />
+            </div>
+            <p className="font-body-sm text-xs md:text-sm text-zinc-700 font-semibold text-center sm:text-left">
+              © {currentYear} Opdex Studio. Built with pastel neo-brutal physics.
+            </p>
+          </div>
           <div className="flex items-center gap-space-xs bg-cream-card px-3 py-1 rounded-full border-2 border-brutal-black shadow-brutal-sm">
             <span className="w-2 h-2 rounded-full bg-pastel-mint border border-brutal-black"></span>
             <span className="font-label-sm text-xs font-bold text-brutal-black">All Systems Playful</span>

@@ -19,6 +19,16 @@ const plusJakarta = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: "Opdex Studio · 3D Artifacts, Zero Gravity",
   description: "Tactile spatial components and playful 3D experiments ready to drop directly into your modern stack.",
+  icons: {
+    icon: [
+      { url: "/logo.svg", type: "image/svg+xml" },
+      { url: "/logo.png", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-icon.png", type: "image/png" },
+    ],
+    shortcut: ["/logo.svg"],
+  },
 };
 
 export default function RootLayout({
@@ -29,6 +39,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${spaceGrotesk.variable} ${plusJakarta.variable}`}>
       <head>
+        <link rel="icon" href="/logo.svg" type="image/svg+xml" />
+        <link rel="alternate icon" href="/logo.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/apple-icon.png" />
         <link
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
           rel="stylesheet"
