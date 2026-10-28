@@ -1,0 +1,2242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUPER GAMEBOY - Interactive 3D Retro Desktop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- GSAP for smooth procedural animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a1612;
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            cursor: none;
+        }
+        a, button, input {
+            cursor: none !important;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+        /* Custom Interactive Hand & Pointer Cursor Overlay (Purely Visual, Zero Text) */
+        #custom-cursor {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 9999;
+            pointer-events: none;
+            transform: translate3d(-100px, -100px, 0);
+            transition: transform 0.04s linear;
+        }
+        #cursor-ring {
+            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .cursor-hover #cursor-ring {
+            transform: scale(1.35);
+            border-color: #a3e635;
+            background-color: rgba(163, 230, 53, 0.14);
+        }
+        .cursor-click #cursor-inner {
+            transform: scale(0.78);
+        }
+        /* Sleek Bottom Camera Menu Styling */
+        .cam-btn {
+            background: rgba(43, 36, 30, 0.85);
+            border: 1px solid rgba(168, 150, 126, 0.28);
+            color: #e5dec9;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .cam-btn:hover {
+            background: rgba(68, 57, 47, 0.95);
+            border-color: rgba(163, 230, 53, 0.65);
+            color: #ffffff;
+            transform: translateY(-1px);
+        }
+        .cam-btn.active {
+            background: rgba(163, 230, 53, 0.16);
+            border-color: #a3e635;
+            color: #d9f99d;
+            box-shadow: 0 0 12px rgba(163, 230, 53, 0.2);
+        }
+        /* Unique Retro Hardware Launcher & Expandable Dock */
+        #retro-dock-panel {
+            transition: all 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+            transform-origin: bottom center;
+        }
+        #retro-dock-panel.dock-closed {
+            opacity: 0;
+            transform: translateY(24px) scale(0.92);
+            pointer-events: none;
+        }
+        #retro-dock-panel.dock-open {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+        #dpad-cross {
+            transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .launcher-active #dpad-cross {
+            transform: rotate(45deg) scale(1.08);
+        }
+        .launcher-active #launcher-led {
+            background-color: #a3e635;
+            box-shadow: 0 0 10px #a3e635;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 3D WebGL Container -->
+    <div id="canvas-container"></div>
+
+    <!-- Unique Retro Hardware Launcher & Expandable Control Deck -->
+    <div class="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center pointer-events-none">
+        
+        <!-- Expandable All-in-One Control Deck (Opens when clicking the unique launcher) -->
+        <div id="retro-dock-panel" class="dock-closed mb-3.5 px-5 py-4 rounded-2xl bg-[#211c17]/92 backdrop-blur-xl border border-[#857259]/45 shadow-[0_18px_45px_rgba(0,0,0,0.8)] flex flex-col gap-3 max-w-[95vw]">
+            
+            <!-- Row 1: CRT Screen Modes + Clock/Timer Controls + Audio Toggle -->
+            <div class="flex flex-wrap items-center justify-center gap-2 pb-2.5 border-b border-[#6e5a44]/30">
+                <!-- Screen Mode Buttons -->
+                <div class="flex items-center gap-1.5">
+                    <button id="mode-cat" onclick="setScreenMode('cat')" class="cam-btn active px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                        <span>🐱</span> Cat + Type
+                    </button>
+                    <button id="mode-terminal" onclick="setScreenMode('terminal')" class="cam-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                        <span>⌨️</span> Full Pad
+                    </button>
+                    <button id="mode-game" onclick="setScreenMode('game')" class="cam-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                        <span>🕹️</span> Snake
+                    </button>
+                </div>
+
+                <span class="text-[#6e5a44]/60 mx-0.5">|</span>
+
+                <!-- Clock & Timer Controls -->
+                <div class="flex flex-wrap items-center gap-1.5 bg-[#16120e]/70 px-2.5 py-1 rounded-xl border border-[#6e5a44]/30">
+                    <button id="clock-mode-btn" onclick="toggleClockTimerMode()" class="cam-btn px-2.5 py-1 rounded-md text-xs font-mono text-lime-300">
+                        ⏰ MODE: CLOCK
+                    </button>
+                    <div id="timer-controls" class="hidden flex items-center gap-1">
+                        <button id="timer-play-btn" onclick="startPauseTimer()" class="cam-btn px-2.5 py-1 rounded-md text-xs font-mono text-amber-300">
+                            ▶ START
+                        </button>
+                        <button onclick="adjustTimer(60)" class="cam-btn px-2 py-1 rounded-md text-xs font-mono">+1m</button>
+                        <button onclick="adjustTimer(10)" class="cam-btn px-2 py-1 rounded-md text-xs font-mono">+10s</button>
+                        <button onclick="resetTimer()" class="cam-btn px-2 py-1 rounded-md text-xs font-mono text-rose-300">RST</button>
+                    </div>
+                </div>
+
+                <span class="text-[#6e5a44]/60 mx-0.5">|</span>
+
+                <!-- SFX Mute Toggle -->
+                <button id="sfx-toggle-btn" onclick="toggleMute()" class="cam-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-amber-300">
+                    <span id="sfx-icon">🔊</span> <span id="sfx-label">SFX On</span>
+                </button>
+            </div>
+
+            <!-- Row 2: Camera Presets -->
+            <div class="flex flex-wrap items-center justify-center gap-2">
+                <span class="text-[10px] font-bold tracking-widest uppercase text-[#a89c8a] mr-1">CAMERA:</span>
+                <button id="cam-overview" onclick="moveCamera('overview')" class="cam-btn active px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                    <span>📷</span> Desk Overview
+                </button>
+                <button id="cam-monitor" onclick="moveCamera('monitor')" class="cam-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                    <span>🖥️</span> CRT Monitor
+                </button>
+                <button id="cam-keyboard" onclick="moveCamera('keyboard')" class="cam-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                    <span>⌨️</span> 3D Keyboard
+                </button>
+                <button id="cam-fanclock" onclick="moveCamera('fanclock')" class="cam-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                    <span>🌀</span> Fan &amp; Timer Clock
+                </button>
+                <button id="cam-arcade" onclick="moveCamera('arcade')" class="cam-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                    <span>🕹️</span> Left Accessories
+                </button>
+            </div>
+        </div>
+
+        <!-- Unique Tactile Retro D-Pad / Cartridge Launcher Button (Not a typical 3-line hamburger!) -->
+        <button id="retro-launcher-btn" onclick="toggleRetroDock()" class="pointer-events-auto group relative flex items-center gap-3 px-4 py-2 rounded-2xl bg-[#cfc5b4] hover:bg-[#dfd6c7] border-2 border-[#52483e] shadow-[0_5px_0_#423930,0_10px_25px_rgba(0,0,0,0.75)] active:translate-y-1 active:shadow-[0_1px_0_#423930] transition-all duration-150">
+            <!-- Status LED Dot -->
+            <span id="launcher-led" class="w-2.5 h-2.5 rounded-full bg-[#e86f2c] shadow-[0_0_6px_#e86f2c] transition-all duration-300"></span>
+            
+            <!-- Rotating Tactile D-Pad Cross Icon (Rotates 45° into an 'X' when opened) -->
+            <div class="w-7 h-7 rounded-lg bg-[#2b2621] border border-[#52483e] flex items-center justify-center shadow-inner">
+                <svg id="dpad-cross" class="w-4 h-4 text-[#e86f2c] group-hover:text-lime-400 transition-colors" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6V3z" stroke="#1a1612" stroke-width="1.2" stroke-linejoin="round"/>
+                    <circle cx="12" cy="12" r="2" fill="#2b2621"/>
+                </svg>
+            </div>
+
+            <!-- Retro Console Slot Label & Twin A/B Pill Accents -->
+            <div class="flex flex-col items-start pr-1">
+                <span class="text-[10px] font-extrabold tracking-widest uppercase text-[#2b2621] leading-none" style="font-family: 'Press Start 2P', monospace; font-size: 9px;">DECK OS</span>
+                <span id="launcher-subtext" class="text-[10px] font-semibold text-[#5c5246] leading-tight mt-0.5">OPEN CONTROLS</span>
+            </div>
+
+            <div class="flex items-center gap-1 pl-1 border-l border-[#a39887]">
+                <span class="w-2.5 h-4 rounded-full bg-[#b8332a] -rotate-12 shadow-sm"></span>
+                <span class="w-2.5 h-4 rounded-full bg-[#e86f2c] -rotate-12 shadow-sm"></span>
+            </div>
+        </button>
+    </div>
+
+    <!-- Custom Stylish Hand / Pointer Cursor Overlay (Purely Visual, No Text Badge) -->
+    <div id="custom-cursor" class="flex items-center justify-center">
+        <div id="cursor-inner" class="relative flex items-center justify-center transition-transform duration-100">
+            <!-- Outer Tactical Ring -->
+            <div id="cursor-ring" class="w-9 h-9 rounded-full border-2 border-amber-400/75 bg-amber-500/10 flex items-center justify-center shadow-[0_0_12px_rgba(251,191,36,0.35)]"></div>
+            <!-- Default Sleek Pointer SVG -->
+            <svg id="cursor-arrow" class="w-5 h-5 text-amber-300 absolute drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M4.5 3.5L19.5 11L12.5 13.5L10 20.5L4.5 3.5Z" stroke="#1a1612" stroke-width="1.8" stroke-linejoin="round"/>
+            </svg>
+            <!-- Interactive Hand Gesture SVG (Shown when hovering 3D interactables) -->
+            <svg id="cursor-hand" class="w-6 h-6 text-lime-300 absolute hidden drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9 11.24V6.5C9 5.12 10.12 4 11.5 4S14 5.12 14 6.5v3.74c1.21-.81 2-2.18 2-3.74C16 5.01 13.99 3 11.5 3S7 5.01 7 7.5c0 1.56.79 2.93 2 3.74zm9.84 4.63l-4.54-2.26c-.17-.07-.35-.11-.54-.11H13v-6c0-.83-.67-1.5-1.5-1.5S10 6.67 10 7.5v10.74l-3.43-.72c-.08-.01-.15-.03-.24-.03-.31 0-.59.13-.79.33l-.79.8 4.94 4.94c.27.27.65.44 1.06.44h6.79c.75 0 1.33-.55 1.44-1.28l.75-5.27c.01-.07.02-.14.02-.2 0-.62-.38-1.16-.91-1.38z" stroke="#1a1612" stroke-width="1.2"/>
+            </svg>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // 1. WEB AUDIO API PROCEDURAL SOUND SYNTHESIZER
+        // ============================================================================
+        class RetroSoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+                this.fanNode = null;
+                this.fanGain = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            // Mechanical Keyboard "Thock" + Click Sound
+            playKeystroke(pitchShift = 1.0) {
+                if (this.muted) return;
+                this.init();
+                const now = this.ctx.currentTime;
+
+                // Short percussive body thock
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(175 * pitchShift, now);
+                osc.frequency.exponentialRampToValueAtTime(42, now + 0.048);
+
+                gain.gain.setValueAtTime(0.32, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.052);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.055);
+
+                // High frequency keycap click transient
+                const clickOsc = this.ctx.createOscillator();
+                const clickGain = this.ctx.createGain();
+                clickOsc.type = 'sine';
+                clickOsc.frequency.setValueAtTime(2500 * pitchShift, now);
+                clickOsc.frequency.exponentialRampToValueAtTime(850, now + 0.012);
+
+                clickGain.gain.setValueAtTime(0.13, now);
+                clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
+
+                clickOsc.connect(clickGain);
+                clickGain.connect(this.ctx.destination);
+                clickOsc.start(now);
+                clickOsc.stop(now + 0.016);
+            }
+
+            // Tactile Plastic Switch / Button Click
+            playSwitch(high = true) {
+                if (this.muted) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(high ? 980 : 640, now);
+                osc.frequency.exponentialRampToValueAtTime(high ? 340 : 190, now + 0.035);
+                gain.gain.setValueAtTime(0.14, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.045);
+            }
+
+            // Classic Gameboy Startup Chime ("Ba-ding!")
+            playGameboyDing() {
+                if (this.muted) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const notes = [987.77, 1318.51]; // B5 -> E6
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'square';
+                    const start = now + idx * 0.09;
+                    const dur = idx === 0 ? 0.09 : 0.45;
+                    osc.frequency.setValueAtTime(freq, start);
+                    gain.gain.setValueAtTime(0.14, start);
+                    gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(start);
+                    osc.stop(start + dur + 0.02);
+                });
+            }
+
+            // Cartridge Clunk Sound
+            playCartridge(inserted = true) {
+                if (this.muted) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(inserted ? 110 : 160, now);
+                osc.frequency.setValueAtTime(inserted ? 220 : 95, now + 0.05);
+                gain.gain.setValueAtTime(0.24, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.15);
+
+                if (inserted) {
+                    setTimeout(() => this.playGameboyDing(), 180);
+                }
+            }
+
+            // Digital Alarm Clock / Timer Beep-Beep
+            playAlarmBeep() {
+                if (this.muted) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                for (let i = 0; i < 4; i++) {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'square';
+                    const t = now + i * 0.13;
+                    osc.frequency.setValueAtTime(2048, t);
+                    gain.gain.setValueAtTime(0.13, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(t);
+                    osc.stop(t + 0.09);
+                }
+            }
+
+            // Update Fan Whirr Sound (4 Speed Levels: 0=Off, 1=Low, 2=Med, 3=Turbo)
+            updateFanSound(speedLevel) {
+                if (this.muted) {
+                    if (this.fanGain && this.ctx) {
+                        this.fanGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+                    }
+                    return;
+                }
+                this.init();
+                if (!this.fanNode) {
+                    this.fanNode = this.ctx.createOscillator();
+                    this.fanGain = this.ctx.createGain();
+                    this.fanNode.type = 'sine';
+                    this.fanNode.frequency.setValueAtTime(65, this.ctx.currentTime);
+                    this.fanGain.gain.setValueAtTime(0, this.ctx.currentTime);
+                    this.fanNode.connect(this.fanGain);
+                    this.fanGain.connect(this.ctx.destination);
+                    this.fanNode.start();
+                }
+                const gains = [0, 0.025, 0.045, 0.07];
+                const freqs = [50, 72, 98, 128];
+                this.fanNode.frequency.setTargetAtTime(freqs[speedLevel] || 0, this.ctx.currentTime, 0.25);
+                this.fanGain.gain.setTargetAtTime(gains[speedLevel] || 0, this.ctx.currentTime, 0.2);
+            }
+        }
+
+        const sfx = new RetroSoundEngine();
+        let sideDialLedMesh = null;
+        let kbAudioLedMesh = null;
+        let dockOpen = false;
+
+        function toggleRetroDock() {
+            dockOpen = !dockOpen;
+            sfx.playSwitch(dockOpen);
+            const panel = document.getElementById('retro-dock-panel');
+            const btn = document.getElementById('retro-launcher-btn');
+            const subtext = document.getElementById('launcher-subtext');
+            if (panel) {
+                panel.classList.toggle('dock-closed', !dockOpen);
+                panel.classList.toggle('dock-open', dockOpen);
+            }
+            if (btn) {
+                btn.classList.toggle('launcher-active', dockOpen);
+            }
+            if (subtext) {
+                subtext.textContent = dockOpen ? 'HIDE CONTROLS' : 'OPEN CONTROLS';
+            }
+        }
+
+        function toggleMute() {
+            sfx.muted = !sfx.muted;
+            sfx.updateFanSound(state.fanSpeed);
+            if (!sfx.muted) {
+                sfx.playSwitch(true);
+            }
+            if (sideDialLedMesh) {
+                sideDialLedMesh.material = sfx.muted ? mats.ledOff : mats.ledGreen;
+            }
+            if (kbAudioLedMesh) {
+                kbAudioLedMesh.material = sfx.muted ? mats.ledOff : mats.ledGreen;
+            }
+            const sfxIcon = document.getElementById('sfx-icon');
+            const sfxLabel = document.getElementById('sfx-label');
+            if (sfxIcon) sfxIcon.textContent = sfx.muted ? '🔇' : '🔊';
+            if (sfxLabel) sfxLabel.textContent = sfx.muted ? 'SFX Muted' : 'SFX On';
+        }
+
+        function showToast(_msg) {
+            // Intentionally silent/no-op for a 100% clean, textless discovery experience
+        }
+
+        // ============================================================================
+        // 2. GLOBAL SCENE STATE (INCLUDING CAT SCREEN INPUT & LIVE CLOCK/TIMER)
+        // ============================================================================
+        const state = {
+            screenMode: 'cat', // 'cat', 'terminal', 'game'
+            catInputText: '', // Real-time text appended directly after 'Type: ' underneath loading...
+            typedText: 'HELLO SUPER GAMEBOY!\nTYPE ON YOUR KEYBOARD\nOR CLICK 3D KEYS...\n> ',
+            marqueeOn: true,
+            crtPower: true,
+            fanSpeed: 2, // 0: off, 1: low, 2: med, 3: turbo
+            clock24h: false,
+            // Interactive Clock & Timer state
+            clockMode: 'clock', // 'clock' or 'timer'
+            timerSeconds: 180,  // Default 03:00 countdown
+            timerRunning: false,
+            timerAlertFlashing: false,
+            cartridgeInserted: true,
+            activeCartridgeTitle: 'SUPER CAT OS v4.0',
+            catJumpOffset: 0,
+            catHearts: [],
+            // Mini-game (Snake) state
+            snake: [{x: 8, y: 6}, {x: 7, y: 6}, {x: 6, y: 6}],
+            snakeDir: {x: 1, y: 0},
+            food: {x: 13, y: 6},
+            score: 0,
+            lastSnakeTick: 0
+        };
+
+        // ============================================================================
+        // 3. THREE.JS SCENE, CAMERA & RENDERER SETUP
+        // ============================================================================
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1f1a16);
+        scene.fog = new THREE.FogExp2(0x1f1a16, 0.018);
+
+        const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(-7.2, 8.8, 13.2);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.1;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.target.set(0.3, 2.2, 0.5);
+        controls.maxPolarAngle = Math.PI / 2 - 0.03;
+        controls.minDistance = 3.5;
+        controls.maxDistance = 26;
+
+        // ============================================================================
+        // 4. COZY STUDIO LIGHTING
+        // ============================================================================
+        const ambientLight = new THREE.AmbientLight(0xffeedd, 0.58);
+        scene.add(ambientLight);
+
+        const keyLight = new THREE.DirectionalLight(0xfff3e0, 1.18);
+        keyLight.position.set(9, 15, 10);
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.width = 2048;
+        keyLight.shadow.mapSize.height = 2048;
+        keyLight.shadow.camera.near = 2;
+        keyLight.shadow.camera.far = 35;
+        const d = 10;
+        keyLight.shadow.camera.left = -d;
+        keyLight.shadow.camera.right = d;
+        keyLight.shadow.camera.top = d;
+        keyLight.shadow.camera.bottom = -d;
+        keyLight.shadow.bias = -0.0005;
+        scene.add(keyLight);
+
+        const fillLight = new THREE.DirectionalLight(0x90b4d4, 0.38);
+        fillLight.position.set(-10, 6, 4);
+        scene.add(fillLight);
+
+        const marqueeLight = new THREE.PointLight(0xff7b1c, 1.1, 5.5);
+        marqueeLight.position.set(-0.8, 5.6, 0.1);
+        scene.add(marqueeLight);
+
+        const crtLight = new THREE.PointLight(0xa8ff3e, 0.85, 5.0);
+        crtLight.position.set(-0.8, 3.6, 1.8);
+        scene.add(crtLight);
+
+        // ============================================================================
+        // 5. SHARED RETRO MATERIALS & INTERACTABLES REGISTRY
+        // ============================================================================
+        const mats = {
+            beigeLight: new THREE.MeshStandardMaterial({ color: 0xd8cfc0, roughness: 0.52, metalness: 0.05 }),
+            beigeMedium: new THREE.MeshStandardMaterial({ color: 0xc2b7a5, roughness: 0.58, metalness: 0.05 }),
+            beigeDark: new THREE.MeshStandardMaterial({ color: 0x9e9485, roughness: 0.62, metalness: 0.08 }),
+            greyBezel: new THREE.MeshStandardMaterial({ color: 0x7a756c, roughness: 0.58, metalness: 0.1 }),
+            greyDark: new THREE.MeshStandardMaterial({ color: 0x474542, roughness: 0.48, metalness: 0.15 }),
+            charcoal: new THREE.MeshStandardMaterial({ color: 0x22201e, roughness: 0.45, metalness: 0.18 }),
+            retroOrange: new THREE.MeshStandardMaterial({ color: 0xe86f2c, roughness: 0.32, metalness: 0.06 }),
+            retroRed: new THREE.MeshStandardMaterial({ color: 0xb8332a, roughness: 0.4, metalness: 0.1 }),
+            whitePlastic: new THREE.MeshStandardMaterial({ color: 0xede8df, roughness: 0.32, metalness: 0.05 }),
+            metalSilver: new THREE.MeshStandardMaterial({ color: 0xb0b5b8, roughness: 0.25, metalness: 0.8 }),
+            ledGreen: new THREE.MeshBasicMaterial({ color: 0x68ff3b }),
+            ledOff: new THREE.MeshStandardMaterial({ color: 0x2c3527, roughness: 0.6 }),
+            ledAmber: new THREE.MeshBasicMaterial({ color: 0xff8811 }),
+            glassClear: new THREE.MeshPhysicalMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.32,
+                roughness: 0.1,
+                metalness: 0.1,
+                transmission: 0.6
+            })
+        };
+
+        const interactables = [];
+        function registerInteractable(mesh, label, onClickFn) {
+            mesh.userData.interactive = true;
+            mesh.userData.label = label;
+            mesh.userData.onClick = onClickFn;
+            interactables.push(mesh);
+        }
+
+        function createRoundedBox(w, h, d, radius = 0.08) {
+            const shape = new THREE.Shape();
+            const eps = 0.00001;
+            const r = Math.min(radius, w * 0.4, h * 0.4, d * 0.4) - eps;
+            shape.absarc(eps, eps, eps, -Math.PI / 2, -Math.PI, true);
+            shape.absarc(eps, h - r * 2, eps, Math.PI, Math.PI / 2, true);
+            shape.absarc(w - r * 2, h - r * 2, eps, Math.PI / 2, 0, true);
+            shape.absarc(w - r * 2, eps, eps, 0, -Math.PI / 2, true);
+
+            const geometry = new THREE.ExtrudeGeometry(shape, {
+                depth: Math.max(0.001, d - r * 2),
+                bevelEnabled: true,
+                bevelSegments: 3,
+                steps: 1,
+                bevelSize: r,
+                bevelThickness: r,
+                curveSegments: 6
+            });
+            geometry.center();
+            return geometry;
+        }
+
+        // ============================================================================
+        // 6. WOODEN DESK, WALLS & RETRO POSTERS
+        // ============================================================================
+        function createEnvironment() {
+            const woodCanvas = document.createElement('canvas');
+            woodCanvas.width = 512;
+            woodCanvas.height = 512;
+            const wCtx = woodCanvas.getContext('2d');
+            wCtx.fillStyle = '#b98d62';
+            wCtx.fillRect(0, 0, 512, 512);
+            for (let i = 0; i < 400; i++) {
+                wCtx.fillStyle = i % 2 === 0 ? 'rgba(135, 92, 52, 0.16)' : 'rgba(215, 175, 130, 0.14)';
+                const y = Math.random() * 512;
+                wCtx.fillRect(0, y, 512, 1 + Math.random() * 4);
+            }
+            const woodTex = new THREE.CanvasTexture(woodCanvas);
+            woodTex.wrapS = THREE.RepeatWrapping;
+            woodTex.wrapT = THREE.RepeatWrapping;
+            woodTex.repeat.set(4, 4);
+
+            const deskMat = new THREE.MeshStandardMaterial({
+                map: woodTex,
+                roughness: 0.65,
+                metalness: 0.05
+            });
+            const deskMesh = new THREE.Mesh(new THREE.BoxGeometry(28, 0.8, 20), deskMat);
+            deskMesh.position.set(0, -0.4, 0);
+            deskMesh.receiveShadow = true;
+            scene.add(deskMesh);
+
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x4a4238, roughness: 0.9 });
+            const backWall = new THREE.Mesh(new THREE.PlaneGeometry(30, 18), wallMat);
+            backWall.position.set(0, 8, -5.5);
+            backWall.receiveShadow = true;
+            scene.add(backWall);
+
+            // Retro "Nintendo" Mario Poster
+            const nintendoCanvas = document.createElement('canvas');
+            nintendoCanvas.width = 512;
+            nintendoCanvas.height = 380;
+            const nCtx = nintendoCanvas.getContext('2d');
+            nCtx.fillStyle = '#141824';
+            nCtx.fillRect(0, 0, 512, 380);
+            nCtx.fillStyle = '#facc15';
+            for (let i = 0; i < 25; i++) {
+                nCtx.fillRect(Math.random() * 500, Math.random() * 360, 6, 6);
+            }
+            nCtx.fillStyle = '#cbd5e1';
+            nCtx.strokeStyle = '#dc2626';
+            nCtx.lineWidth = 10;
+            nCtx.beginPath();
+            nCtx.roundRect(26, 28, 430, 95, 45);
+            nCtx.fill();
+            nCtx.stroke();
+            nCtx.fillStyle = '#1e293b';
+            nCtx.font = '900 64px "Inter", sans-serif';
+            nCtx.fillText('Nintendo', 75, 96);
+            nCtx.fillStyle = '#ef4444';
+            nCtx.beginPath();
+            nCtx.arc(210, 240, 65, 0, Math.PI * 2);
+            nCtx.fill();
+            nCtx.fillStyle = '#fca5a5';
+            nCtx.beginPath();
+            nCtx.arc(225, 255, 48, 0, Math.PI * 2);
+            nCtx.fill();
+            nCtx.fillStyle = '#2563eb';
+            nCtx.fillRect(175, 300, 90, 80);
+
+            const nintendoTex = new THREE.CanvasTexture(nintendoCanvas);
+            const poster1 = new THREE.Mesh(
+                new THREE.BoxGeometry(5.6, 4.2, 0.08),
+                new THREE.MeshStandardMaterial({ map: nintendoTex, roughness: 0.5 })
+            );
+            poster1.position.set(-4.3, 2.1, -4.4);
+            poster1.rotation.y = 0.14;
+            poster1.rotation.x = -0.08;
+            poster1.castShadow = true;
+            scene.add(poster1);
+
+            // Retro Shonen Jump Anime Magazine Poster
+            const jumpCanvas = document.createElement('canvas');
+            jumpCanvas.width = 400;
+            jumpCanvas.height = 520;
+            const jCtx = jumpCanvas.getContext('2d');
+            jCtx.fillStyle = '#eab308';
+            jCtx.fillRect(0, 0, 400, 520);
+            jCtx.fillStyle = '#dc2626';
+            jCtx.fillRect(15, 20, 370, 95);
+            jCtx.fillStyle = '#ffffff';
+            jCtx.font = 'bold 54px sans-serif';
+            jCtx.fillText('SHONEN', 75, 88);
+            jCtx.fillStyle = '#2563eb';
+            jCtx.beginPath();
+            jCtx.arc(200, 290, 110, 0, Math.PI * 2);
+            jCtx.fill();
+            jCtx.fillStyle = '#f97316';
+            jCtx.fillRect(90, 340, 220, 140);
+
+            const jumpTex = new THREE.CanvasTexture(jumpCanvas);
+            const poster2 = new THREE.Mesh(
+                new THREE.BoxGeometry(3.8, 4.9, 0.08),
+                new THREE.MeshStandardMaterial({ map: jumpTex, roughness: 0.5 })
+            );
+            poster2.position.set(0.4, 2.45, -4.7);
+            poster2.rotation.y = -0.05;
+            poster2.rotation.x = -0.06;
+            poster2.castShadow = true;
+            scene.add(poster2);
+        }
+
+        // ============================================================================
+        // 7. DYNAMIC CANVAS TEXTURES FOR CRT MONITOR, MARQUEE & CLOCK/TIMER
+        // ============================================================================
+
+        // --- A. Top Marquee "SUPER GAMEBOY" Texture ---
+        const marqueeCanvas = document.createElement('canvas');
+        marqueeCanvas.width = 512;
+        marqueeCanvas.height = 96;
+        const mCtx = marqueeCanvas.getContext('2d');
+        const marqueeTexture = new THREE.CanvasTexture(marqueeCanvas);
+
+        function updateMarqueeTexture() {
+            mCtx.clearRect(0, 0, 512, 96);
+            if (state.marqueeOn) {
+                const grad = mCtx.createLinearGradient(0, 0, 0, 96);
+                grad.addColorStop(0, '#ffb74d');
+                grad.addColorStop(0.5, '#ff8f00');
+                grad.addColorStop(1, '#e65100');
+                mCtx.fillStyle = grad;
+                mCtx.fillRect(0, 0, 512, 96);
+
+                mCtx.strokeStyle = '#fff3e0';
+                mCtx.lineWidth = 4;
+                mCtx.strokeRect(8, 8, 496, 80);
+
+                mCtx.fillStyle = '#2b1200';
+                mCtx.font = 'bold 34px "Press Start 2P", monospace';
+                mCtx.textAlign = 'center';
+                mCtx.textBaseline = 'middle';
+                mCtx.fillText('SUPER GAMEBOY', 256, 52);
+            } else {
+                mCtx.fillStyle = '#4a3219';
+                mCtx.fillRect(0, 0, 512, 96);
+                mCtx.fillStyle = '#241608';
+                mCtx.font = 'bold 34px "Press Start 2P", monospace';
+                mCtx.textAlign = 'center';
+                mCtx.textBaseline = 'middle';
+                mCtx.fillText('SUPER GAMEBOY', 256, 52);
+            }
+            marqueeTexture.needsUpdate = true;
+        }
+        updateMarqueeTexture();
+
+        // --- B. Main Green CRT Screen Canvas Texture (Matching Reference Image 3!) ---
+        const crtCanvas = document.createElement('canvas');
+        crtCanvas.width = 512;
+        crtCanvas.height = 384;
+        const cCtx = crtCanvas.getContext('2d');
+        const crtTexture = new THREE.CanvasTexture(crtCanvas);
+
+        // Pixel Art Cat Bitmap (16x13 grid matching the reference photo's pixel cat)
+        const catBitmap = [
+            "0000010000010000",
+            "0000111000111000",
+            "0000111111111000",
+            "0001111111111100",
+            "0001100111001100",
+            "0001100111001100",
+            "0001111111111100",
+            "1100111111111000",
+            "0110111111111100",
+            "0011111111111100",
+            "0001111111111000",
+            "0000110000110000",
+            "0000110000110000"
+        ];
+
+        function drawCRT(time) {
+            if (!state.crtPower) {
+                cCtx.fillStyle = '#182214';
+                cCtx.fillRect(0, 0, 512, 384);
+                crtTexture.needsUpdate = true;
+                return;
+            }
+
+            // Warm sage/olive-green phosphor background matching Reference Image 3
+            const grd = cCtx.createRadialGradient(256, 192, 40, 256, 192, 340);
+            grd.addColorStop(0, '#c8df87');
+            grd.addColorStop(1, '#b2cc72');
+            cCtx.fillStyle = grd;
+            cCtx.fillRect(0, 0, 512, 384);
+
+            // Subtle horizontal CRT scanlines
+            cCtx.fillStyle = 'rgba(38, 66, 18, 0.075)';
+            for (let y = 0; y < 384; y += 3) {
+                cCtx.fillRect(0, y, 512, 1);
+            }
+
+            // Top thin dark-green framing line (just like Reference Image 3)
+            cCtx.fillStyle = '#2d4c17';
+            cCtx.fillRect(22, 16, 468, 3);
+
+            if (state.screenMode === 'cat') {
+                // 1. Draw Animated Pixel Cat in Center
+                const bounce = Math.floor(Math.sin(time * 5.0) * 4) - state.catJumpOffset;
+                const pxSize = 11;
+                const startX = 256 - (16 * pxSize) / 2;
+                const startY = 66 + bounce;
+
+                const blink = Math.sin(time * 3.1) > 0.93;
+                const wag = Math.floor(time * 3.5) % 2 === 1;
+
+                for (let r = 0; r < catBitmap.length; r++) {
+                    for (let c = 0; c < 16; c++) {
+                        let ch = catBitmap[r][c];
+                        // Subtle tail wag animation on left pixels
+                        if (wag && c < 3 && r >= 7 && r <= 9) {
+                            ch = catBitmap[r - 1]?.[c] || '0';
+                        }
+                        if (ch === '1') {
+                            cCtx.fillStyle = '#2b4a15';
+                            cCtx.fillRect(startX + c * pxSize, startY + r * pxSize, pxSize - 1.2, pxSize - 1.2);
+                        } else if ((r === 4 || r === 5) && (c === 5 || c === 6 || c === 10 || c === 11)) {
+                            // Cat Eyes cutout
+                            cCtx.fillStyle = blink ? '#2b4a15' : '#c4db83';
+                            cCtx.fillRect(startX + c * pxSize, startY + r * pxSize, pxSize - 1.2, pxSize - 1.2);
+                        }
+                    }
+                }
+
+                // Floating hearts when user pets/clicks the cat or types
+                state.catHearts.forEach((h) => {
+                    h.y -= 1.1;
+                    h.alpha -= 0.016;
+                    if (h.alpha > 0) {
+                        cCtx.fillStyle = `rgba(43, 74, 21, ${h.alpha})`;
+                        cCtx.font = '28px "VT323", monospace';
+                        cCtx.textAlign = 'center';
+                        cCtx.fillText('♥', h.x, h.y);
+                    }
+                });
+                state.catHearts = state.catHearts.filter(h => h.alpha > 0);
+
+                // 2. "loading... ." animation directly beneath the pixel cat
+                const dotCycle = Math.floor(time * 2.2) % 4;
+                const trailingDots = dotCycle === 0 ? '' : (dotCycle === 1 ? ' .' : (dotCycle === 2 ? ' ..' : ' ...'));
+                cCtx.fillStyle = '#2b4a15';
+                cCtx.font = '42px "VT323", monospace';
+                cCtx.textAlign = 'center';
+                cCtx.fillText(`loading...${trailingDots}`, 256, 268);
+
+                // 3. Interactive "Type: " line right underneath loading... (Preserving the rest of the screen!)
+                const displayTyped = state.catInputText.length > 18
+                    ? state.catInputText.slice(-18)
+                    : state.catInputText;
+                const labelAndText = `Type: ${displayTyped}`;
+
+                cCtx.font = '34px "VT323", monospace';
+                cCtx.fillStyle = 'rgba(43, 74, 21, 0.92)';
+                cCtx.textAlign = 'center';
+
+                // Measure text so the solid blinking block cursor sits right after 'Type: [user input]'
+                const textMetrics = cCtx.measureText(labelAndText);
+                const centerX = 248;
+                const baselineY = 334;
+                cCtx.fillText(labelAndText, centerX, baselineY);
+
+                // Blinking solid dark-green block cursor right after the typed characters
+                if (Math.floor(time * 2.6) % 2 === 0) {
+                    const cursorX = centerX + textMetrics.width / 2 + 5;
+                    cCtx.fillStyle = '#3c5e1f';
+                    cCtx.fillRect(cursorX, baselineY - 26, 15, 30);
+                }
+
+            } else if (state.screenMode === 'terminal') {
+                // Full Interactive Multi-line Terminal Mode
+                cCtx.fillStyle = '#2b4a15';
+                cCtx.font = '22px "VT323", monospace';
+                cCtx.textAlign = 'left';
+                cCtx.fillText('SUPER GAMEBOY WORDPAD [ESC TO CLEAR]', 26, 42);
+
+                cCtx.font = '30px "VT323", monospace';
+                const lines = state.typedText.split('\n');
+                const visibleLines = lines.slice(-8);
+                const cursor = Math.floor(time * 2.8) % 2 === 0 ? '█' : ' ';
+
+                visibleLines.forEach((line, idx) => {
+                    const isLast = idx === visibleLines.length - 1;
+                    cCtx.fillText(line + (isLast ? cursor : ''), 26, 82 + idx * 36);
+                });
+
+            } else if (state.screenMode === 'game') {
+                // Playable Retro Snake Mini-Game
+                if (time - state.lastSnakeTick > 0.18) {
+                    state.lastSnakeTick = time;
+                    const head = {
+                        x: (state.snake[0].x + state.snakeDir.x + 20) % 20,
+                        y: (state.snake[0].y + state.snakeDir.y + 12) % 12
+                    };
+                    state.snake.unshift(head);
+                    if (head.x === state.food.x && head.y === state.food.y) {
+                        state.score += 10;
+                        sfx.playSwitch(true);
+                        state.food = {
+                            x: Math.floor(Math.random() * 20),
+                            y: Math.floor(Math.random() * 12)
+                        };
+                    } else {
+                        state.snake.pop();
+                    }
+                }
+
+                cCtx.strokeStyle = '#2b4a15';
+                cCtx.lineWidth = 3;
+                cCtx.strokeRect(32, 48, 448, 272);
+
+                const cellW = 440 / 20;
+                const cellH = 264 / 12;
+
+                cCtx.fillStyle = '#2b4a15';
+                cCtx.fillRect(36 + state.food.x * cellW, 52 + state.food.y * cellH, cellW - 3, cellH - 3);
+
+                state.snake.forEach((seg, idx) => {
+                    cCtx.fillStyle = idx === 0 ? '#182b0b' : '#35591b';
+                    cCtx.fillRect(36 + seg.x * cellW, 52 + seg.y * cellH, cellW - 2, cellH - 2);
+                });
+
+                cCtx.fillStyle = '#2b4a15';
+                cCtx.font = '24px "VT323", monospace';
+                cCtx.textAlign = 'center';
+                cCtx.fillText(`SCORE: ${state.score}  |  USE WASD / ARROWS / 3D JOYSTICK`, 256, 352);
+            }
+
+            crtTexture.needsUpdate = true;
+        }
+
+        // --- C. Live Clocks & Interactive Countdown Timer Display ---
+        const miniClockCanvas = document.createElement('canvas');
+        miniClockCanvas.width = 256;
+        miniClockCanvas.height = 110;
+        const mcCtx = miniClockCanvas.getContext('2d');
+        const miniClockTexture = new THREE.CanvasTexture(miniClockCanvas);
+
+        const deskClockCanvas = document.createElement('canvas');
+        deskClockCanvas.width = 320;
+        deskClockCanvas.height = 150;
+        const dcCtx = deskClockCanvas.getContext('2d');
+        const deskClockTexture = new THREE.CanvasTexture(deskClockCanvas);
+
+        function updateLiveClocks() {
+            const now = new Date();
+            let hours = now.getHours();
+            const mins = String(now.getMinutes()).padStart(2, '0');
+            const secs = now.getSeconds();
+            const ampm = hours >= 12 ? 'pm' : 'am';
+
+            const displayHours12 = String(hours % 12 || 12).padStart(2, '0');
+            const displayHours24 = String(hours).padStart(2, '0');
+            const dateStr = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', weekday: 'short' });
+
+            // 1. Mini Sub-Display below CRT (Always keeps Live Real-Time Clock running)
+            mcCtx.fillStyle = '#0e170c';
+            mcCtx.fillRect(0, 0, 256, 110);
+            mcCtx.fillStyle = '#7dff4d';
+            mcCtx.font = '22px "VT323", monospace';
+            mcCtx.textAlign = 'center';
+            mcCtx.fillText(dateStr, 128, 34);
+            mcCtx.font = 'bold 48px "VT323", monospace';
+            mcCtx.fillText(`${displayHours12}:${mins} ${ampm}`, 128, 82);
+            miniClockTexture.needsUpdate = true;
+
+            // 2. Desk Digital Clock & Interactive Timer (Right side of desk)
+            const isAlert = state.timerAlertFlashing && secs % 2 === 0;
+            dcCtx.fillStyle = isAlert ? '#421810' : '#0f170c';
+            dcCtx.fillRect(0, 0, 320, 150);
+
+            // Top mini status indicators directly on the 3D digital clock LCD
+            dcCtx.font = '20px "VT323", monospace';
+            dcCtx.textAlign = 'left';
+            dcCtx.fillStyle = state.clockMode === 'timer' ? '#ffb74d' : '#5cd63a';
+            dcCtx.fillText(
+                state.clockMode === 'timer'
+                    ? (state.timerRunning ? '● TIMER ▶' : '● TIMER ⏸')
+                    : (state.clock24h ? '● CLOCK 24H' : '● CLOCK 12H'),
+                18,
+                24
+            );
+            dcCtx.textAlign = 'right';
+            dcCtx.fillStyle = '#4ea832';
+            dcCtx.fillText(
+                state.clockMode === 'timer'
+                    ? '[M]  [▶/⏸]  [+1m]'
+                    : `${String(secs).padStart(2, '0')}s`,
+                302,
+                24
+            );
+
+            // Faint background 88:88 segments
+            dcCtx.fillStyle = 'rgba(110, 255, 60, 0.07)';
+            dcCtx.font = 'bold 96px "VT323", monospace';
+            dcCtx.textAlign = 'center';
+            dcCtx.textBaseline = 'middle';
+            dcCtx.fillText('88:88', 160, 88);
+
+            // Foreground live digits (Clock vs Countdown Timer)
+            dcCtx.fillStyle = isAlert ? '#ff6e40' : (state.clockMode === 'timer' ? '#a8ff3e' : '#80ff33');
+            dcCtx.shadowColor = isAlert ? '#ff3d00' : '#66ff00';
+            dcCtx.shadowBlur = 12;
+
+            if (state.clockMode === 'timer') {
+                const tMins = String(Math.floor(state.timerSeconds / 60)).padStart(2, '0');
+                const tSecs = String(state.timerSeconds % 60).padStart(2, '0');
+                const colon = !state.timerRunning || secs % 2 === 0 ? ':' : ' ';
+                dcCtx.fillText(`${tMins}${colon}${tSecs}`, 160, 88);
+            } else {
+                const colon = secs % 2 === 0 ? ':' : ' ';
+                const hStr = state.clock24h ? displayHours24 : displayHours12;
+                dcCtx.fillText(`${hStr}${colon}${mins}`, 160, 88);
+            }
+            dcCtx.shadowBlur = 0;
+            deskClockTexture.needsUpdate = true;
+        }
+
+        // Countdown Timer 1-second tick interval
+        setInterval(() => {
+            if (state.clockMode === 'timer' && state.timerRunning) {
+                if (state.timerSeconds > 0) {
+                    state.timerSeconds--;
+                    if (state.timerSeconds === 0) {
+                        state.timerRunning = false;
+                        state.timerAlertFlashing = true;
+                        sfx.playAlarmBeep();
+                        updateTimerUIButtons();
+                        showToast("⏰ TIMER FINISHED! 00:00 Reached!");
+                        setTimeout(() => { state.timerAlertFlashing = false; updateLiveClocks(); }, 6000);
+                    }
+                }
+            }
+            updateLiveClocks();
+        }, 1000);
+        updateLiveClocks();
+
+        // Clock & Timer Helper Controls
+        function updateTimerUIButtons() {
+            const modeBtn = document.getElementById('clock-mode-btn');
+            const timerCtrls = document.getElementById('timer-controls');
+            const playBtn = document.getElementById('timer-play-btn');
+            if (modeBtn) {
+                modeBtn.textContent = state.clockMode === 'timer' ? '⏱️ MODE: TIMER' : '⏰ MODE: CLOCK';
+            }
+            if (timerCtrls) {
+                timerCtrls.classList.toggle('hidden', state.clockMode !== 'timer');
+            }
+            if (playBtn) {
+                playBtn.textContent = state.timerRunning ? '⏸ PAUSE' : '▶ START';
+            }
+        }
+
+        function toggleClockTimerMode() {
+            state.clockMode = state.clockMode === 'clock' ? 'timer' : 'clock';
+            state.timerAlertFlashing = false;
+            sfx.playSwitch(true);
+            updateTimerUIButtons();
+            updateLiveClocks();
+            showToast(state.clockMode === 'timer'
+                ? "Desk Clock switched to COUNTDOWN TIMER Mode! Use top bar or 3D clock buttons."
+                : "Desk Clock switched to LIVE REAL-TIME CLOCK Mode.");
+        }
+
+        function startPauseTimer() {
+            state.timerAlertFlashing = false;
+            if (state.timerSeconds === 0) state.timerSeconds = 60;
+            state.timerRunning = !state.timerRunning;
+            sfx.playSwitch(state.timerRunning);
+            updateTimerUIButtons();
+            updateLiveClocks();
+            showToast(state.timerRunning ? "Timer Started ▶" : "Timer Paused ⏸");
+        }
+
+        function adjustTimer(deltaSec) {
+            state.timerAlertFlashing = false;
+            state.timerSeconds = Math.max(0, Math.min(5999, state.timerSeconds + deltaSec));
+            sfx.playKeystroke(1.15);
+            updateLiveClocks();
+            const m = String(Math.floor(state.timerSeconds / 60)).padStart(2, '0');
+            const s = String(state.timerSeconds % 60).padStart(2, '0');
+            showToast(`Timer Set: ${m}:${s}`);
+        }
+
+        function resetTimer() {
+            state.timerRunning = false;
+            state.timerAlertFlashing = false;
+            state.timerSeconds = 180;
+            sfx.playSwitch(false);
+            updateTimerUIButtons();
+            updateLiveClocks();
+            showToast("Timer Reset to 03:00");
+        }
+
+        // ============================================================================
+        // 8. BUILD THE "SUPER GAMEBOY" RETRO DESKTOP COMPUTER
+        // ============================================================================
+        let cartridgeMesh, leftDialMesh, baseJoystickMesh;
+        const baseSliders = [];
+
+        function createSuperGameboyPC() {
+            const pcGroup = new THREE.Group();
+            pcGroup.position.set(-0.9, 0, -0.35);
+            scene.add(pcGroup);
+
+            // --- 1. LOWER CONSOLE DECK BASE ---
+            const lowerBase = new THREE.Mesh(createRoundedBox(5.2, 0.75, 4.8, 0.14), mats.beigeMedium);
+            lowerBase.position.set(0, 0.38, 0.25);
+            lowerBase.castShadow = true;
+            lowerBase.receiveShadow = true;
+            pcGroup.add(lowerBase);
+
+            const upperDeck = new THREE.Mesh(createRoundedBox(4.9, 0.7, 4.4, 0.12), mats.beigeLight);
+            upperDeck.position.set(0, 0.95, 0.15);
+            upperDeck.castShadow = true;
+            upperDeck.receiveShadow = true;
+            pcGroup.add(upperDeck);
+
+            // Slanted Front Control Deck Surface
+            const controlSlope = new THREE.Mesh(createRoundedBox(4.7, 0.55, 2.1, 0.1), mats.beigeLight);
+            controlSlope.position.set(0, 1.25, 1.35);
+            controlSlope.rotation.x = 0.22;
+            controlSlope.castShadow = true;
+            controlSlope.receiveShadow = true;
+            pcGroup.add(controlSlope);
+
+            // --- 2. LEFT ORANGE CIRCULAR ROCKER PAD & 3 LINEAR FADERS ---
+            const padBase = new THREE.Mesh(createRoundedBox(1.3, 0.22, 1.2, 0.06), mats.beigeMedium);
+            padBase.position.set(-1.55, 1.48, 1.5);
+            padBase.rotation.x = 0.22;
+            pcGroup.add(padBase);
+
+            const orangePadGroup = new THREE.Group();
+            orangePadGroup.position.set(-1.55, 1.62, 1.45);
+            orangePadGroup.rotation.x = 0.22;
+            pcGroup.add(orangePadGroup);
+
+            const halfCylLeft = new THREE.CylinderGeometry(0.42, 0.44, 0.12, 24, 1, false, 0.15, Math.PI - 0.3);
+            const padLeft = new THREE.Mesh(halfCylLeft, mats.retroOrange);
+            padLeft.rotation.y = Math.PI;
+            orangePadGroup.add(padLeft);
+
+            const halfCylRight = new THREE.CylinderGeometry(0.42, 0.44, 0.12, 24, 1, false, 0.15, Math.PI - 0.3);
+            const padRight = new THREE.Mesh(halfCylRight, mats.retroOrange);
+            orangePadGroup.add(padRight);
+
+            registerInteractable(padLeft, "Orange Rocker Pad (Switch Screen Mode)", () => {
+                sfx.playSwitch(true);
+                gsap.to(orangePadGroup.rotation, { z: 0.18, duration: 0.1, yoyo: true, repeat: 1 });
+                cycleScreenMode();
+            });
+            registerInteractable(padRight, "Orange Rocker Pad (Switch Screen Mode)", () => {
+                sfx.playSwitch(false);
+                gsap.to(orangePadGroup.rotation, { z: -0.18, duration: 0.1, yoyo: true, repeat: 1 });
+                cycleScreenMode();
+            });
+
+            // Three Metallic Vertical Fader Sliders on Front Left Bevel
+            for (let i = 0; i < 3; i++) {
+                const slotX = -1.92 + i * 0.36;
+                const track = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.12, 0.55), mats.charcoal);
+                track.position.set(slotX, 1.16, 2.38);
+                track.rotation.x = 0.55;
+                pcGroup.add(track);
+
+                const sliderCap = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 0.14), mats.beigeDark);
+                sliderCap.position.set(slotX, 1.24, 2.38);
+                sliderCap.rotation.x = 0.55;
+                sliderCap.userData.toggled = i === 1;
+                pcGroup.add(sliderCap);
+                baseSliders.push(sliderCap);
+
+                registerInteractable(sliderCap, `Console Fader Slider ${i + 1}`, () => {
+                    sfx.playSwitch(!sliderCap.userData.toggled);
+                    sliderCap.userData.toggled = !sliderCap.userData.toggled;
+                    gsap.to(sliderCap.position, {
+                        z: sliderCap.userData.toggled ? 2.25 : 2.46,
+                        y: sliderCap.userData.toggled ? 1.32 : 1.19,
+                        duration: 0.2
+                    });
+                    showToast(`Adjusted Console Fader #${i + 1}`);
+                });
+            }
+
+            // --- 3. CENTER ROW OF 4 ROTARY KNOBS & 4 TINY GREEN KEYS ---
+            for (let i = 0; i < 4; i++) {
+                const kx = -0.35 + i * 0.42;
+                const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.15, 0.2, 20), mats.greyBezel);
+                knob.position.set(kx, 1.56, 1.05);
+                knob.rotation.x = 0.22;
+                pcGroup.add(knob);
+
+                registerInteractable(knob, `Channel Knob ${i + 1}`, () => {
+                    sfx.playSwitch(true);
+                    gsap.to(knob.rotation, { y: knob.rotation.y + Math.PI / 2, duration: 0.2 });
+                    state.catHearts.push({ x: 140 + Math.random() * 230, y: 190, alpha: 1.0 });
+                    showToast(`Rotated Synthesizer Knob #${i + 1} ♪`);
+                });
+
+                const gKey = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.1, 0.18), mats.greyBezel);
+                gKey.position.set(kx + 0.35, 1.35, 1.65);
+                gKey.rotation.x = 0.22;
+                pcGroup.add(gKey);
+
+                registerInteractable(gKey, `Preset Macro Key ${i + 1}`, () => {
+                    sfx.playKeystroke(1.2 + i * 0.1);
+                    gsap.to(gKey.position, { y: 1.30, duration: 0.07, yoyo: true, repeat: 1 });
+                    state.catJumpOffset = 22;
+                    gsap.to(state, { catJumpOffset: 0, duration: 0.4, ease: "bounce.out" });
+                });
+            }
+
+            // --- 4. RIGHT BASE KNOB & RED LAUNCH BUTTON ---
+            baseJoystickMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.3, 0.22, 24), mats.greyBezel);
+            baseJoystickMesh.position.set(1.85, 1.62, 1.0);
+            baseJoystickMesh.rotation.x = 0.22;
+            pcGroup.add(baseJoystickMesh);
+
+            const redBtnHousing = new THREE.Mesh(createRoundedBox(0.55, 0.24, 0.55, 0.05), mats.beigeMedium);
+            redBtnHousing.position.set(1.9, 1.42, 1.65);
+            redBtnHousing.rotation.x = 0.22;
+            pcGroup.add(redBtnHousing);
+
+            const redBtn = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.16, 0.36), mats.retroRed);
+            redBtn.position.set(1.9, 1.52, 1.65);
+            redBtn.rotation.x = 0.22;
+            pcGroup.add(redBtn);
+
+            registerInteractable(redBtn, "System Chime / Pet Pixel Cat Button", () => {
+                sfx.playGameboyDing();
+                gsap.to(redBtn.position, { y: 1.45, duration: 0.08, yoyo: true, repeat: 1 });
+                for (let i = 0; i < 4; i++) {
+                    state.catHearts.push({ x: 160 + i * 60, y: 180 + (i % 2) * 20, alpha: 1.0 });
+                }
+                showToast("SUPER GAMEBOY Chime! Pixel Cat is happy ♥");
+            });
+
+            // --- 5. LEFT SIDE CARTRIDGE SLOT & REMOVABLE GAME CARTRIDGE ---
+            const slotBezel = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.32, 1.55), mats.charcoal);
+            slotBezel.position.set(-2.45, 0.95, 0.4);
+            pcGroup.add(slotBezel);
+
+            const slotLed = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 12), mats.ledGreen);
+            slotLed.position.set(-2.46, 1.12, 1.25);
+            pcGroup.add(slotLed);
+
+            cartridgeMesh = new THREE.Group();
+            cartridgeMesh.position.set(-2.65, 0.95, 0.4);
+            pcGroup.add(cartridgeMesh);
+
+            const cartBody = new THREE.Mesh(createRoundedBox(0.95, 0.22, 1.38, 0.04), mats.greyDark);
+            cartBody.castShadow = true;
+            cartridgeMesh.add(cartBody);
+
+            const cartLabel = new THREE.Mesh(new THREE.PlaneGeometry(0.65, 1.05), mats.retroRed);
+            cartLabel.rotation.x = -Math.PI / 2;
+            cartLabel.position.set(-0.05, 0.12, 0);
+            cartridgeMesh.add(cartLabel);
+
+            registerInteractable(cartBody, "Side System Cartridge (Click to Eject / Insert)", () => {
+                state.cartridgeInserted = !state.cartridgeInserted;
+                sfx.playCartridge(state.cartridgeInserted);
+                slotLed.material = state.cartridgeInserted ? mats.ledGreen : mats.charcoal;
+                gsap.to(cartridgeMesh.position, {
+                    x: state.cartridgeInserted ? -2.65 : -3.35,
+                    duration: 0.35,
+                    ease: "back.out(1.6)"
+                });
+                showToast(state.cartridgeInserted ? "Cartridge Inserted! System Ready." : "Cartridge Ejected!");
+            });
+
+            // --- 6. UPPER CRT MONITOR HOUSING ---
+            const monitorHousing = new THREE.Mesh(createRoundedBox(4.3, 3.6, 3.3, 0.22), mats.beigeLight);
+            monitorHousing.position.set(0, 3.35, -0.2);
+            monitorHousing.castShadow = true;
+            monitorHousing.receiveShadow = true;
+            pcGroup.add(monitorHousing);
+
+            const frontBezel = new THREE.Mesh(createRoundedBox(3.95, 3.25, 0.35, 0.14), mats.beigeMedium);
+            frontBezel.position.set(0, 3.35, 1.38);
+            pcGroup.add(frontBezel);
+
+            const crtFrame = new THREE.Mesh(createRoundedBox(3.35, 2.25, 0.25, 0.1), mats.greyBezel);
+            crtFrame.position.set(0, 3.62, 1.5);
+            pcGroup.add(crtFrame);
+
+            const crtScreenMat = new THREE.MeshBasicMaterial({ map: crtTexture });
+            const crtScreen = new THREE.Mesh(new THREE.PlaneGeometry(2.85, 1.88), crtScreenMat);
+            crtScreen.position.set(0, 3.62, 1.63);
+            pcGroup.add(crtScreen);
+
+            registerInteractable(crtScreen, "CRT Display (Click to Pet Cat • Type on Keyboard)", () => {
+                sfx.playSwitch(true);
+                state.catJumpOffset = 24;
+                gsap.to(state, { catJumpOffset: 0, duration: 0.45, ease: "bounce.out" });
+                state.catHearts.push({ x: 180 + Math.random() * 150, y: 170, alpha: 1.0 });
+                showToast("Meow! Start typing on your keyboard to append after 'Type:' on screen.");
+            });
+
+            // --- 7. MINI LIVE CLOCK SUB-DISPLAY BELOW CRT ---
+            const miniClockFrame = new THREE.Mesh(createRoundedBox(1.05, 0.48, 0.15, 0.04), mats.charcoal);
+            miniClockFrame.position.set(0, 2.12, 1.52);
+            pcGroup.add(miniClockFrame);
+
+            const miniClockScreen = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.92, 0.38),
+                new THREE.MeshBasicMaterial({ map: miniClockTexture })
+            );
+            miniClockScreen.position.set(0, 2.12, 1.605);
+            pcGroup.add(miniClockScreen);
+
+            [-0.78, 0.78].forEach((dx, idx) => {
+                const subKnob = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.18, 20), mats.greyBezel);
+                subKnob.rotation.x = Math.PI / 2;
+                subKnob.position.set(dx, 2.12, 1.55);
+                pcGroup.add(subKnob);
+
+                registerInteractable(subKnob, idx === 0 ? "CRT Power Toggle Knob" : "CRT Mode Selector Knob", () => {
+                    sfx.playSwitch(idx === 0);
+                    gsap.to(subKnob.rotation, { z: subKnob.rotation.z + Math.PI / 3, duration: 0.2 });
+                    if (idx === 0) {
+                        state.crtPower = !state.crtPower;
+                        crtLight.intensity = state.crtPower ? 0.85 : 0;
+                        showToast(state.crtPower ? "CRT Monitor Powered ON" : "CRT Monitor Standby");
+                    } else {
+                        cycleScreenMode();
+                    }
+                });
+            });
+
+            const ledGreenBar = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.05, 0.05), mats.ledGreen);
+            ledGreenBar.position.set(1.62, 2.16, 1.56);
+            pcGroup.add(ledGreenBar);
+
+            const ledAmberBar = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.05, 0.05), mats.ledAmber);
+            ledAmberBar.position.set(1.62, 2.06, 1.56);
+            pcGroup.add(ledAmberBar);
+
+            // --- 8. LARGE LEFT SIDE ROTARY DIAL WITH GREEN LED ---
+            const sideDialGroup = new THREE.Group();
+            sideDialGroup.position.set(-2.22, 3.45, 0.1);
+            pcGroup.add(sideDialGroup);
+
+            leftDialMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.42, 32), mats.greyDark);
+            leftDialMesh.rotation.z = Math.PI / 2;
+            leftDialMesh.castShadow = true;
+            sideDialGroup.add(leftDialMesh);
+
+            const dialLed = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.16, 0.08), mats.ledGreen);
+            dialLed.position.set(-0.22, 0.42, 0);
+            sideDialGroup.add(dialLed);
+            sideDialLedMesh = dialLed;
+
+            registerInteractable(leftDialMesh, "", () => {
+                gsap.to(sideDialGroup.rotation, { x: sideDialGroup.rotation.x + Math.PI / 3, duration: 0.25 });
+                toggleMute();
+            });
+
+            // --- 9. GLOWING "SUPER GAMEBOY" TOP MARQUEE SIGN ---
+            const marqueeBase = new THREE.Mesh(createRoundedBox(3.15, 0.18, 0.55, 0.04), mats.beigeMedium);
+            marqueeBase.position.set(0, 5.2, 0.45);
+            pcGroup.add(marqueeBase);
+
+            const marqueeGlass = new THREE.Mesh(createRoundedBox(2.95, 0.62, 0.36, 0.05), mats.glassClear);
+            marqueeGlass.position.set(0, 5.52, 0.45);
+            pcGroup.add(marqueeGlass);
+
+            const marqueePlate = new THREE.Mesh(
+                new THREE.BoxGeometry(2.78, 0.48, 0.16),
+                new THREE.MeshBasicMaterial({ map: marqueeTexture })
+            );
+            marqueePlate.position.set(0, 5.5, 0.45);
+            pcGroup.add(marqueePlate);
+
+            registerInteractable(marqueeGlass, "SUPER GAMEBOY Neon Marquee (Click to Toggle Light)", () => {
+                state.marqueeOn = !state.marqueeOn;
+                sfx.playSwitch(state.marqueeOn);
+                marqueeLight.intensity = state.marqueeOn ? 1.1 : 0;
+                updateMarqueeTexture();
+                showToast(state.marqueeOn ? "Marquee Sign Light ON" : "Marquee Sign Light OFF");
+            });
+
+            // --- 10. "COLUMBIA ( 4 )" STICKY NOTE ON UPPER RIGHT BEZEL ---
+            const noteCanvas = document.createElement('canvas');
+            noteCanvas.width = 180;
+            noteCanvas.height = 210;
+            const nCtx = noteCanvas.getContext('2d');
+            nCtx.fillStyle = '#dfd8c8';
+            nCtx.fillRect(0, 0, 180, 210);
+            nCtx.fillStyle = '#332f2a';
+            nCtx.font = 'bold 20px sans-serif';
+            nCtx.textAlign = 'center';
+            nCtx.fillText('COLUMBIA', 90, 42);
+            nCtx.font = '38px serif';
+            nCtx.fillText('( 4 )', 90, 115);
+            nCtx.font = '14px monospace';
+            nCtx.fillText('hand drip coffee', 90, 175);
+
+            const noteTex = new THREE.CanvasTexture(noteCanvas);
+            const stickyNote = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.68, 0.78),
+                new THREE.MeshStandardMaterial({ map: noteTex, side: THREE.DoubleSide, roughness: 0.8 })
+            );
+            stickyNote.position.set(1.92, 4.55, 1.57);
+            stickyNote.rotation.z = -0.06;
+            stickyNote.rotation.x = -0.08;
+            pcGroup.add(stickyNote);
+
+            registerInteractable(stickyNote, "Sticky Note: COLUMBIA (4) Hand Drip Coffee", () => {
+                sfx.playSwitch(true);
+                gsap.fromTo(stickyNote.rotation, { x: -0.35 }, { x: -0.08, duration: 0.4, ease: "elastic.out(1.2, 0.4)" });
+                showToast("Sticky Note: 'COLUMBIA ( 4 ) - hand drip coffee'");
+            });
+        }
+
+        // ============================================================================
+        // 9. ALPHABET-LABELED 3D MECHANICAL KEYBOARD (CRISP TOP-FACE KEYCAP LEGENDS)
+        // ============================================================================
+        const keyMeshesByCode = {};
+
+        function createMechanicalKeyboard() {
+            const kbGroup = new THREE.Group();
+            kbGroup.position.set(1.05, 0, 3.55);
+            kbGroup.rotation.y = -0.22;
+            scene.add(kbGroup);
+
+            // Slanted Keyboard Chassis
+            const chassis = new THREE.Mesh(createRoundedBox(4.45, 0.42, 2.3, 0.1), mats.beigeLight);
+            chassis.position.set(0, 0.22, 0);
+            chassis.rotation.x = 0.14;
+            chassis.castShadow = true;
+            chassis.receiveShadow = true;
+            kbGroup.add(chassis);
+
+            // Recessed Dark Keywell Plate
+            const keywell = new THREE.Mesh(new THREE.BoxGeometry(3.32, 0.1, 1.76), mats.beigeDark);
+            keywell.position.set(-0.38, 0.39, 0.06);
+            keywell.rotation.x = 0.14;
+            kbGroup.add(keywell);
+
+            // "SUPER GAMEBOY" orange branding text on top right lip of keyboard
+            const brandCanvas = document.createElement('canvas');
+            brandCanvas.width = 256;
+            brandCanvas.height = 48;
+            const bCtx = brandCanvas.getContext('2d');
+            bCtx.fillStyle = '#d8cfc0';
+            bCtx.fillRect(0, 0, 256, 48);
+            bCtx.fillStyle = '#e8511a';
+            bCtx.font = 'bold 24px "Press Start 2P", monospace';
+            bCtx.fillText('SUPER GAMEBOY', 8, 32);
+            const brandPlane = new THREE.Mesh(
+                new THREE.PlaneGeometry(1.35, 0.22),
+                new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(brandCanvas) })
+            );
+            brandPlane.rotation.x = -Math.PI / 2 + 0.14;
+            brandPlane.position.set(0.85, 0.34, -0.92);
+            kbGroup.add(brandPlane);
+
+            // Orange Rotary Volume/Encoder Knob on top right of keyboard
+            const orangeKnob = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.21, 0.24, 28), mats.retroOrange);
+            orangeKnob.position.set(1.64, 0.44, -0.56);
+            orangeKnob.rotation.x = 0.14;
+            orangeKnob.castShadow = true;
+            kbGroup.add(orangeKnob);
+
+            // Subtle Audio Status LED next to keyboard volume knob
+            kbAudioLedMesh = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 12), mats.ledGreen);
+            kbAudioLedMesh.position.set(1.32, 0.36, -0.56);
+            kbGroup.add(kbAudioLedMesh);
+
+            registerInteractable(orangeKnob, "", () => {
+                gsap.to(orangeKnob.rotation, { y: orangeKnob.rotation.y + Math.PI / 2, duration: 0.2 });
+                toggleMute();
+            });
+
+            // Perforated Speaker Grille below orange knob on keyboard right side
+            const speakerCanvas = document.createElement('canvas');
+            speakerCanvas.width = 128;
+            speakerCanvas.height = 128;
+            const spCtx = speakerCanvas.getContext('2d');
+            spCtx.fillStyle = '#c8beae';
+            spCtx.fillRect(0, 0, 128, 128);
+            spCtx.fillStyle = '#332f2c';
+            for (let r = -3; r <= 3; r++) {
+                for (let c = -3; c <= 3; c++) {
+                    if (r * r + c * c <= 11) {
+                        spCtx.beginPath();
+                        spCtx.arc(64 + c * 14, 64 + r * 14, 3.2, 0, Math.PI * 2);
+                        spCtx.fill();
+                    }
+                }
+            }
+            const speakerRing = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.38, 0.38, 0.06, 28),
+                new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(speakerCanvas), roughness: 0.6 })
+            );
+            speakerRing.position.set(1.64, 0.36, 0.24);
+            speakerRing.rotation.x = 0.14;
+            kbGroup.add(speakerRing);
+
+            // Generate 3D Keycaps with Explicit Crisp Top-Face Alphabet Textures
+            const rows = [
+                [
+                    { label: 'ESC', code: 'Escape', w: 1.05, dark: true },
+                    { label: '1', code: 'Digit1', w: 1 },
+                    { label: '2', code: 'Digit2', w: 1 },
+                    { label: '3', code: 'Digit3', w: 1 },
+                    { label: '4', code: 'Digit4', w: 1 },
+                    { label: '5', code: 'Digit5', w: 1 },
+                    { label: '6', code: 'Digit6', w: 1 },
+                    { label: '7', code: 'Digit7', w: 1 },
+                    { label: '8', code: 'Digit8', w: 1 },
+                    { label: '9', code: 'Digit9', w: 1 },
+                    { label: '0', code: 'Digit0', w: 1 },
+                    { label: 'DEL', code: 'Backspace', w: 1.25, dark: true }
+                ],
+                [
+                    { label: 'TAB', code: 'Tab', w: 1.2, dark: true },
+                    { label: 'Q', code: 'KeyQ', w: 1 },
+                    { label: 'W', code: 'KeyW', w: 1 },
+                    { label: 'E', code: 'KeyE', w: 1 },
+                    { label: 'R', code: 'KeyR', w: 1 },
+                    { label: 'T', code: 'KeyT', w: 1 },
+                    { label: 'Y', code: 'KeyY', w: 1 },
+                    { label: 'U', code: 'KeyU', w: 1 },
+                    { label: 'I', code: 'KeyI', w: 1 },
+                    { label: 'O', code: 'KeyO', w: 1 },
+                    { label: 'P', code: 'KeyP', w: 1.1 }
+                ],
+                [
+                    { label: 'CAPS', code: 'CapsLock', w: 1.3, dark: true },
+                    { label: 'A', code: 'KeyA', w: 1 },
+                    { label: 'S', code: 'KeyS', w: 1 },
+                    { label: 'D', code: 'KeyD', w: 1 },
+                    { label: 'F', code: 'KeyF', w: 1 },
+                    { label: 'G', code: 'KeyG', w: 1 },
+                    { label: 'H', code: 'KeyH', w: 1 },
+                    { label: 'J', code: 'KeyJ', w: 1 },
+                    { label: 'K', code: 'KeyK', w: 1 },
+                    { label: 'L', code: 'KeyL', w: 1 },
+                    { label: 'ENT', code: 'Enter', w: 1.35, dark: true }
+                ],
+                [
+                    { label: 'SHF', code: 'ShiftLeft', w: 1.35, dark: true },
+                    { label: 'Z', code: 'KeyZ', w: 1 },
+                    { label: 'X', code: 'KeyX', w: 1 },
+                    { label: 'C', code: 'KeyC', w: 1 },
+                    { label: 'V', code: 'KeyV', w: 1 },
+                    { label: 'B', code: 'KeyB', w: 1 },
+                    { label: 'N', code: 'KeyN', w: 1 },
+                    { label: 'M', code: 'KeyM', w: 1 },
+                    { label: '.', code: 'Period', w: 1 },
+                    { label: 'SPACE', code: 'Space', w: 1.95, dark: true }
+                ]
+            ];
+
+            const unit = 0.258;
+            const startZ = -0.58;
+
+            rows.forEach((row, rIdx) => {
+                let curX = -1.90;
+                const zPos = startZ + rIdx * 0.40;
+                const yBase = 0.49 - rIdx * 0.055;
+
+                row.forEach((k) => {
+                    const kw = k.w * unit - 0.032;
+                    const kd = unit - 0.032;
+
+                    // Create High-Contrast Keycap Top Texture so Alphabet Characters Pop Clearly
+                    const kCanvas = document.createElement('canvas');
+                    kCanvas.width = 128;
+                    kCanvas.height = 128;
+                    const kCtx = kCanvas.getContext('2d');
+
+                    const baseHex = k.dark ? '#736c61' : '#d2c8b6';
+                    const topDishHex = k.dark ? '#827a6e' : '#e3dacb';
+                    kCtx.fillStyle = baseHex;
+                    kCtx.fillRect(0, 0, 128, 128);
+
+                    // Subtle sculpted spherical keycap dish highlight on top
+                    kCtx.fillStyle = topDishHex;
+                    kCtx.beginPath();
+                    kCtx.roundRect(10, 10, 108, 108, 18);
+                    kCtx.fill();
+
+                    // High-contrast crisp alphabet/character legend
+                    kCtx.fillStyle = k.dark ? '#fff9ed' : '#26221e';
+                    const fontSize = k.label.length > 3 ? 28 : (k.label.length > 1 ? 34 : 58);
+                    kCtx.font = `800 ${fontSize}px "Inter", sans-serif`;
+                    kCtx.textAlign = 'center';
+                    kCtx.textBaseline = 'middle';
+                    kCtx.fillText(k.label, 64, 66);
+
+                    const topTex = new THREE.CanvasTexture(kCanvas);
+                    topTex.anisotropy = 4;
+
+                    const sideMat = new THREE.MeshStandardMaterial({
+                        color: k.dark ? 0x696258 : 0xbdb2a0,
+                        roughness: 0.5
+                    });
+                    const topMat = new THREE.MeshStandardMaterial({
+                        map: topTex,
+                        roughness: 0.38
+                    });
+
+                    // BoxGeometry with 6 face materials so +Y (index 2) gets the full crisp alphabet texture
+                    const keyGeo = new THREE.BoxGeometry(kw, 0.16, kd);
+                    const materials = [sideMat, sideMat, topMat, sideMat, sideMat, sideMat];
+
+                    const keyMesh = new THREE.Mesh(keyGeo, materials);
+                    keyMesh.position.set(curX + (k.w * unit) / 2, yBase, zPos);
+                    keyMesh.rotation.x = 0.14;
+                    keyMesh.castShadow = true;
+                    keyMesh.receiveShadow = true;
+                    keyMesh.userData.restY = yBase;
+                    keyMesh.userData.keyLabel = k.label;
+                    keyMesh.userData.keyCode = k.code;
+                    keyMesh.userData.topMat = topMat;
+                    kbGroup.add(keyMesh);
+
+                    keyMeshesByCode[k.code] = keyMesh;
+
+                    registerInteractable(keyMesh, `Key [${k.label}] (Click or Type)`, () => {
+                        triggerKeyPress(k.code, k.label);
+                    });
+
+                    curX += k.w * unit;
+                });
+            });
+        }
+
+        // Handle 3D Key Depression + Real-time Typing on CRT Screen
+        function triggerKeyPress(code, charLabel) {
+            const pitch = 0.92 + Math.random() * 0.18;
+            sfx.playKeystroke(pitch);
+
+            const keyMesh = keyMeshesByCode[code] || Object.values(keyMeshesByCode)[Math.floor(Math.random() * 20)];
+            if (keyMesh) {
+                gsap.killTweensOf(keyMesh.position);
+                gsap.to(keyMesh.position, {
+                    y: keyMesh.userData.restY - 0.085,
+                    duration: 0.045,
+                    yoyo: true,
+                    repeat: 1
+                });
+                // Brief tactile keycap highlight flash
+                if (keyMesh.userData.topMat) {
+                    keyMesh.userData.topMat.emissive = new THREE.Color(0x557722);
+                    setTimeout(() => {
+                        if (keyMesh.userData.topMat) keyMesh.userData.topMat.emissive.setHex(0x000000);
+                    }, 110);
+                }
+            }
+
+            // Spawn a floating heart on pixel cat screen when typing
+            state.catHearts.push({ x: 130 + Math.random() * 250, y: 205, alpha: 0.85 });
+
+            // Snake Game Controls via WASD / Arrows
+            if (state.screenMode === 'game') {
+                if (code === 'KeyW' || code === 'ArrowUp') state.snakeDir = { x: 0, y: -1 };
+                if (code === 'KeyS' || code === 'ArrowDown') state.snakeDir = { x: 0, y: 1 };
+                if (code === 'KeyA' || code === 'ArrowLeft') state.snakeDir = { x: -1, y: 0 };
+                if (code === 'KeyD' || code === 'ArrowRight') state.snakeDir = { x: 1, y: 0 };
+            }
+
+            // 1. Update 'Type: ' real-time input underneath 'loading...' in Cat Mode
+            if (code === 'Backspace' || charLabel === 'DEL') {
+                state.catInputText = state.catInputText.slice(0, -1);
+                if (state.typedText.length > 0) {
+                    state.typedText = state.typedText.slice(0, -1);
+                }
+            } else if (code === 'Escape' || charLabel === 'ESC') {
+                state.catInputText = '';
+                state.typedText = '> ';
+                showToast("Cleared 'Type:' screen input!");
+            } else if (code === 'Enter' || charLabel === 'ENT') {
+                sfx.playGameboyDing();
+                state.catJumpOffset = 20;
+                gsap.to(state, { catJumpOffset: 0, duration: 0.4, ease: "bounce.out" });
+                state.typedText += '\n> ';
+            } else if (code === 'Space' || charLabel === 'SPACE' || charLabel === 'SPC') {
+                state.catInputText += ' ';
+                state.typedText += ' ';
+            } else if (charLabel && charLabel.length === 1) {
+                state.catInputText += charLabel.toUpperCase();
+                const lines = state.typedText.split('\n');
+                const currentLine = lines[lines.length - 1];
+                if (currentLine.length >= 26) {
+                    state.typedText += '\n' + charLabel.toUpperCase();
+                } else {
+                    state.typedText += charLabel.toUpperCase();
+                }
+            }
+        }
+
+        // Physical Keyboard Listener
+        window.addEventListener('keydown', (e) => {
+            if (e.metaKey || e.ctrlKey) return;
+            if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Backspace'].includes(e.code)) {
+                e.preventDefault();
+            }
+            const label = e.key.length === 1 ? e.key.toUpperCase() : e.code;
+            triggerKeyPress(e.code, label);
+        });
+
+        // ============================================================================
+        // 10. DESK ACCESSORIES (NON-CLIPPING 3D TURBINE FAN, TIMER CLOCK, JOYSTICK, ETC.)
+        // ============================================================================
+        let fanBladesGroup, arcadeStickGroup;
+        const fanLedMeshes = [];
+
+        function createDeskAccessories() {
+            // --- A. DETAILED NON-CLIPPING 3D TURBINE DESK FAN (Right of Monitor) ---
+            const fanGroup = new THREE.Group();
+            fanGroup.position.set(2.45, 0, -0.85);
+            fanGroup.rotation.y = -0.35;
+            scene.add(fanGroup);
+
+            // Multi-tiered beige/white fan base
+            const fanBase1 = new THREE.Mesh(createRoundedBox(1.85, 0.55, 2.35, 0.15), mats.whitePlastic);
+            fanBase1.position.set(0, 0.28, 0);
+            fanBase1.castShadow = true;
+            fanBase1.receiveShadow = true;
+            fanGroup.add(fanBase1);
+
+            const fanBase2 = new THREE.Mesh(createRoundedBox(1.35, 0.45, 1.15, 0.08), mats.beigeLight);
+            fanBase2.position.set(0, 0.72, -0.45);
+            fanBase2.castShadow = true;
+            fanGroup.add(fanBase2);
+
+            // Recessed circular dish on front of fan base
+            const baseDish = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.42, 0.12, 24), mats.beigeMedium);
+            baseDish.position.set(0, 0.56, 0.45);
+            fanGroup.add(baseDish);
+
+            // 3 Glowing green LED dots on left side of fan base indicating speed level
+            for (let i = 0; i < 3; i++) {
+                const fLed = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.045, 12, 12),
+                    i < state.fanSpeed ? mats.ledGreen : mats.ledOff
+                );
+                fLed.position.set(-0.93, 0.35, -0.3 + i * 0.18);
+                fanGroup.add(fLed);
+                fanLedMeshes.push(fLed);
+            }
+
+            // Vertical cylindrical stem
+            const fanStem = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 1.35, 24), mats.whitePlastic);
+            fanStem.position.set(0, 1.55, -0.45);
+            fanStem.castShadow = true;
+            fanGroup.add(fanStem);
+
+            // Deep Hollow Turbine Shroud Assembly (NO flat front black disc that clips blades!)
+            const headCenterY = 2.48;
+            const headCenterZ = -0.45;
+            const fanHeadGroup = new THREE.Group();
+            fanHeadGroup.position.set(0, headCenterY, headCenterZ);
+            fanGroup.add(fanHeadGroup);
+
+            // 1. Outer cylindrical shroud wall (open-ended cylinder + front torus bezel lip)
+            const outerShell = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.84, 0.78, 0.96, 40, 1, true),
+                mats.whitePlastic
+            );
+            outerShell.rotation.x = Math.PI / 2;
+            outerShell.castShadow = true;
+            fanHeadGroup.add(outerShell);
+
+            // Inner dark wall lining of the hollow tunnel
+            const innerWallMat = new THREE.MeshStandardMaterial({
+                color: 0x26221e,
+                roughness: 0.7,
+                side: THREE.BackSide
+            });
+            const innerTunnel = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.75, 0.72, 0.92, 40, 1, true),
+                innerWallMat
+            );
+            innerTunnel.rotation.x = Math.PI / 2;
+            fanHeadGroup.add(innerTunnel);
+
+            // Rounded front lip ring around the hollow opening
+            const frontLip = new THREE.Mesh(
+                new THREE.TorusGeometry(0.79, 0.055, 16, 40),
+                mats.whitePlastic
+            );
+            frontLip.position.set(0, 0, 0.46);
+            fanHeadGroup.add(frontLip);
+
+            // 2. Rear recessed backplate & dome cap well BEHIND the rotor blades (at z = -0.38)
+            const rearBackplate = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.73, 0.73, 0.08, 36),
+                mats.charcoal
+            );
+            rearBackplate.rotation.x = Math.PI / 2;
+            rearBackplate.position.set(0, 0, -0.38);
+            fanHeadGroup.add(rearBackplate);
+
+            const rearCap = new THREE.Mesh(
+                new THREE.SphereGeometry(0.78, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2),
+                mats.whitePlastic
+            );
+            rearCap.rotation.x = -Math.PI / 2;
+            rearCap.scale.z = 0.35;
+            rearCap.position.set(0, 0, -0.45);
+            fanHeadGroup.add(rearCap);
+
+            // 3. Rotor Hub & 12 Full Radial Pitched Orange Blades inside the unobstructed cavity (z = +0.12)
+            fanBladesGroup = new THREE.Group();
+            fanBladesGroup.position.set(0, 0, 0.12);
+            fanHeadGroup.add(fanBladesGroup);
+
+            // Central cylindrical stem + smooth orange nose cone hub
+            const rotorCyl = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.21, 0.23, 0.24, 28),
+                mats.retroOrange
+            );
+            rotorCyl.rotation.x = Math.PI / 2;
+            fanBladesGroup.add(rotorCyl);
+
+            const rotorNose = new THREE.Mesh(
+                new THREE.SphereGeometry(0.21, 24, 16),
+                mats.retroOrange
+            );
+            rotorNose.position.set(0, 0, 0.08);
+            rotorNose.scale.set(1, 1, 0.75);
+            fanBladesGroup.add(rotorNose);
+
+            // 12 Full Radial Turbine Blades extending cleanly from central hub to inner rim
+            const bladeCount = 12;
+            const bladeGeo = createRoundedBox(0.16, 0.54, 0.032, 0.012);
+            // Offset blade geometry so its base sits inside the hub and extends radially outward
+            bladeGeo.translate(0, 0.42, 0);
+
+            for (let i = 0; i < bladeCount; i++) {
+                const bladePivot = new THREE.Group();
+                bladePivot.rotation.z = (i / bladeCount) * Math.PI * 2;
+
+                const bladeMesh = new THREE.Mesh(bladeGeo, mats.retroOrange);
+                // Pitch each turbine blade at 32 degrees like a real jet/desk fan
+                bladeMesh.rotation.y = 0.56;
+                bladeMesh.castShadow = true;
+                bladePivot.add(bladeMesh);
+
+                fanBladesGroup.add(bladePivot);
+            }
+
+            const toggleFan = () => {
+                state.fanSpeed = (state.fanSpeed + 1) % 4;
+                sfx.playSwitch(state.fanSpeed > 0);
+                sfx.updateFanSound(state.fanSpeed);
+                fanLedMeshes.forEach((led, idx) => {
+                    led.material = idx < state.fanSpeed ? mats.ledGreen : mats.ledOff;
+                });
+                const labels = ['OFF', 'LOW BREEZE', 'MEDIUM FLOW', 'HIGH TURBO'];
+                showToast(`3D Turbine Desk Fan Speed: ${labels[state.fanSpeed]}`);
+            };
+
+            registerInteractable(outerShell, "3D Turbine Desk Fan (Click to Cycle Speed: Off/Low/Med/Turbo)", toggleFan);
+            registerInteractable(rotorNose, "3D Turbine Rotor Hub (Click to Cycle Fan Speed)", toggleFan);
+            registerInteractable(fanBase1, "Desk Fan Base (Click to Cycle Speed)", toggleFan);
+
+            // --- B. DIGITAL ALARM CLOCK + INTERACTIVE TIMER (Far Right Background) ---
+            const clockGroup = new THREE.Group();
+            clockGroup.position.set(4.55, 0, -1.25);
+            clockGroup.rotation.y = -0.28;
+            scene.add(clockGroup);
+
+            const clockBody = new THREE.Mesh(createRoundedBox(2.1, 1.3, 0.98, 0.2), mats.whitePlastic);
+            clockBody.position.set(0, 0.65, 0);
+            clockBody.castShadow = true;
+            clockBody.receiveShadow = true;
+            clockGroup.add(clockBody);
+
+            const clockScreenMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(1.62, 0.82),
+                new THREE.MeshBasicMaterial({ map: deskClockTexture })
+            );
+            clockScreenMesh.position.set(0, 0.65, 0.50);
+            clockGroup.add(clockScreenMesh);
+
+            // Large Orange Top Bar Button (Starts/Pauses Timer in Timer Mode, or toggles 12h/24h in Clock Mode)
+            const snoozeBtn = new THREE.Mesh(createRoundedBox(0.9, 0.18, 0.38, 0.05), mats.retroOrange);
+            snoozeBtn.position.set(0, 1.34, 0);
+            clockGroup.add(snoozeBtn);
+
+            // Two small tactile grey buttons on top of clock for Mode & +1 Min Timer adjustment
+            const modeMiniBtn = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.14, 16), mats.greyDark);
+            modeMiniBtn.position.set(-0.68, 1.32, 0);
+            clockGroup.add(modeMiniBtn);
+
+            const plusMiniBtn = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.14, 16), mats.greyDark);
+            plusMiniBtn.position.set(0.68, 1.32, 0);
+            clockGroup.add(plusMiniBtn);
+
+            registerInteractable(snoozeBtn, "", () => {
+                gsap.to(snoozeBtn.position, { y: 1.26, duration: 0.08, yoyo: true, repeat: 1 });
+                if (state.clockMode === 'timer') {
+                    if (state.timerSeconds === 0 && !state.timerRunning) {
+                        resetTimer();
+                    } else {
+                        startPauseTimer();
+                    }
+                } else {
+                    state.clock24h = !state.clock24h;
+                    sfx.playAlarmBeep();
+                    updateLiveClocks();
+                }
+            });
+
+            registerInteractable(clockScreenMesh, "", () => {
+                toggleClockTimerMode();
+            });
+
+            registerInteractable(modeMiniBtn, "", () => {
+                gsap.to(modeMiniBtn.position, { y: 1.26, duration: 0.08, yoyo: true, repeat: 1 });
+                if (state.clockMode === 'timer' && !state.timerRunning && state.timerSeconds !== 180) {
+                    resetTimer();
+                } else {
+                    toggleClockTimerMode();
+                }
+            });
+
+            registerInteractable(plusMiniBtn, "", () => {
+                gsap.to(plusMiniBtn.position, { y: 1.26, duration: 0.08, yoyo: true, repeat: 1 });
+                if (state.clockMode !== 'timer') state.clockMode = 'timer';
+                adjustTimer(60);
+            });
+
+            // --- C. MINI ARCADE JOYSTICK CONTROLLER (Bottom Left Foreground) ---
+            const joyController = new THREE.Group();
+            joyController.position.set(-1.55, 0, 4.15);
+            joyController.rotation.y = 0.28;
+            scene.add(joyController);
+
+            const joyBase = new THREE.Mesh(createRoundedBox(1.85, 0.48, 1.05, 0.22), mats.beigeLight);
+            joyBase.position.set(0, 0.24, 0);
+            joyBase.castShadow = true;
+            joyBase.receiveShadow = true;
+            joyController.add(joyBase);
+
+            const joyLed = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.16, 0.05), mats.ledGreen);
+            joyLed.position.set(0, 0.24, 0.53);
+            joyController.add(joyLed);
+
+            arcadeStickGroup = new THREE.Group();
+            arcadeStickGroup.position.set(-0.48, 0.48, 0);
+            joyController.add(arcadeStickGroup);
+
+            const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.45, 12), mats.metalSilver);
+            shaft.position.set(0, 0.2, 0);
+            arcadeStickGroup.add(shaft);
+
+            const ballTop = new THREE.Mesh(new THREE.SphereGeometry(0.24, 24, 24), mats.greyBezel);
+            ballTop.position.set(0, 0.45, 0);
+            ballTop.castShadow = true;
+            arcadeStickGroup.add(ballTop);
+
+            registerInteractable(ballTop, "Mini Arcade Joystick (Click to Wiggle & Control Game)", () => {
+                sfx.playSwitch(true);
+                const dirs = [{x: 0, y: -1}, {x: 1, y: 0}, {x: 0, y: 1}, {x: -1, y: 0}];
+                state.snakeDir = dirs[Math.floor(Math.random() * dirs.length)];
+                gsap.fromTo(arcadeStickGroup.rotation,
+                    { z: -0.35, x: 0.25 },
+                    { z: 0, x: 0, duration: 0.45, ease: "elastic.out(1.2, 0.3)" }
+                );
+                showToast("Wiggled Mini Arcade Joystick!");
+            });
+
+            [0.12, 0.55].forEach((bx, idx) => {
+                const aBtn = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.14, 20), mats.retroOrange);
+                aBtn.position.set(bx, 0.50, 0);
+                joyController.add(aBtn);
+
+                registerInteractable(aBtn, `Arcade Fire Button ${idx + 1}`, () => {
+                    sfx.playKeystroke(idx === 0 ? 1.3 : 0.85);
+                    gsap.to(aBtn.position, { y: 0.43, duration: 0.06, yoyo: true, repeat: 1 });
+                    state.catJumpOffset = 28;
+                    gsap.to(state, { catJumpOffset: 0, duration: 0.4, ease: "bounce.out" });
+                    showToast(`Pressed Arcade Button ${idx === 0 ? 'A' : 'B'}!`);
+                });
+            });
+
+            // --- D. RETRO PUCK MOUSE (Right of Keyboard) ---
+            const mouseGroup = new THREE.Group();
+            mouseGroup.position.set(3.25, 0, 2.25);
+            mouseGroup.rotation.y = -0.25;
+            scene.add(mouseGroup);
+
+            const mouseBody = new THREE.Mesh(createRoundedBox(1.15, 0.42, 1.55, 0.14), mats.beigeLight);
+            mouseBody.position.set(0, 0.21, 0);
+            mouseBody.castShadow = true;
+            mouseGroup.add(mouseBody);
+
+            const mouseLed = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.04, 0.08), mats.ledGreen);
+            mouseLed.position.set(0, 0.43, 0.25);
+            mouseGroup.add(mouseLed);
+
+            registerInteractable(mouseBody, "Retro Two-Button Mouse (Click to Move & Click)", () => {
+                sfx.playSwitch(true);
+                gsap.to(mouseGroup.position, {
+                    x: 3.25 + (Math.random() - 0.5) * 0.4,
+                    z: 2.25 + (Math.random() - 0.5) * 0.4,
+                    duration: 0.25
+                });
+                showToast("Retro Mouse Clicked!");
+            });
+
+            // --- E. GAMEBOY CARTRIDGE LYING ON DESK (Right Side) ---
+            const deskCartGroup = new THREE.Group();
+            deskCartGroup.position.set(3.15, 0.12, 0.85);
+            deskCartGroup.rotation.y = 0.12;
+            scene.add(deskCartGroup);
+
+            const dCartBody = new THREE.Mesh(createRoundedBox(1.25, 0.22, 1.55, 0.05), mats.greyBezel);
+            dCartBody.castShadow = true;
+            deskCartGroup.add(dCartBody);
+
+            const labelCanvas = document.createElement('canvas');
+            labelCanvas.width = 128;
+            labelCanvas.height = 128;
+            const lCtx = labelCanvas.getContext('2d');
+            lCtx.fillStyle = '#22c55e';
+            lCtx.fillRect(0, 0, 128, 128);
+            lCtx.fillStyle = '#facc15';
+            lCtx.beginPath();
+            lCtx.arc(64, 64, 40, 0, Math.PI * 2);
+            lCtx.fill();
+            lCtx.fillStyle = '#ef4444';
+            lCtx.fillRect(20, 20, 88, 24);
+
+            const dCartLabel = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.75, 0.95),
+                new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(labelCanvas) })
+            );
+            dCartLabel.rotation.x = -Math.PI / 2;
+            dCartLabel.position.set(0.05, 0.12, 0.08);
+            deskCartGroup.add(dCartLabel);
+
+            registerInteractable(dCartBody, "Game Cartridge on Desk (Click to Swap ROM Program)", () => {
+                sfx.playCartridge(true);
+                gsap.fromTo(deskCartGroup.position, { y: 0.65 }, { y: 0.12, duration: 0.4, ease: "bounce.out" });
+                cycleScreenMode();
+                showToast(`Loaded Cartridge ROM: ${state.screenMode.toUpperCase()} MODE`);
+            });
+
+            // --- F. "MARKET ROBOT" GADGET & "PIRATE ACTIVIST" STICKER (Bottom Left) ---
+            const robotBoxGroup = new THREE.Group();
+            robotBoxGroup.position.set(-3.45, 0, 2.75);
+            robotBoxGroup.rotation.y = 0.18;
+            scene.add(robotBoxGroup);
+
+            const mBox = new THREE.Mesh(createRoundedBox(0.92, 1.15, 0.72, 0.08), mats.beigeMedium);
+            mBox.position.set(0, 0.58, 0);
+            mBox.castShadow = true;
+            robotBoxGroup.add(mBox);
+
+            const mKnob = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.26, 0.28, 20), mats.charcoal);
+            mKnob.position.set(0, 1.25, 0);
+            robotBoxGroup.add(mKnob);
+
+            registerInteractable(mBox, "MARKET ROBOT Fidget Gadget", () => {
+                sfx.playSwitch(false);
+                gsap.to(mKnob.rotation, { y: mKnob.rotation.y + Math.PI / 2, duration: 0.2 });
+                gsap.fromTo(robotBoxGroup.rotation, { z: -0.1 }, { z: 0, duration: 0.3, ease: "elastic.out(1, 0.3)" });
+                showToast("Clicked MARKET ROBOT Fidget Box!");
+            });
+
+            const stickerCanvas = document.createElement('canvas');
+            stickerCanvas.width = 256;
+            stickerCanvas.height = 160;
+            const sCtx = stickerCanvas.getContext('2d');
+            sCtx.fillStyle = '#e5e0d5';
+            sCtx.fillRect(0, 0, 256, 160);
+            sCtx.strokeStyle = '#1c1917';
+            sCtx.lineWidth = 6;
+            sCtx.strokeRect(8, 8, 240, 144);
+            sCtx.fillStyle = '#1c1917';
+            sCtx.font = 'bold 34px "Inter", sans-serif';
+            sCtx.fillText('PIRATE', 55, 68);
+            sCtx.fillText('ACTIVIST', 45, 112);
+
+            const stickerMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(1.35, 0.85),
+                new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(stickerCanvas), roughness: 0.7 })
+            );
+            stickerMesh.rotation.x = -Math.PI / 2;
+            stickerMesh.rotation.z = 0.25;
+            stickerMesh.position.set(-3.35, 0.01, 4.05);
+            scene.add(stickerMesh);
+
+            // --- G. CUTE SPHERICAL MECH ROBOT FIGURINE (Far Right) ---
+            const mechGroup = new THREE.Group();
+            mechGroup.position.set(4.85, 0.45, 0.65);
+            mechGroup.rotation.y = -0.5;
+            scene.add(mechGroup);
+
+            const mechBody = new THREE.Mesh(new THREE.SphereGeometry(0.42, 24, 24), mats.beigeMedium);
+            mechBody.castShadow = true;
+            mechGroup.add(mechBody);
+
+            const mechDome = new THREE.Mesh(new THREE.SphereGeometry(0.35, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2), mats.glassClear);
+            mechDome.position.set(0, 0.18, 0);
+            mechGroup.add(mechDome);
+
+            const mechEye = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 12), mats.retroOrange);
+            mechEye.position.set(0, 0.1, 0.36);
+            mechGroup.add(mechEye);
+
+            registerInteractable(mechBody, "Mini Spherical Mech Figurine", () => {
+                sfx.playGameboyDing();
+                gsap.fromTo(mechGroup.position, { y: 1.1 }, { y: 0.45, duration: 0.5, ease: "bounce.out" });
+                gsap.to(mechGroup.rotation, { y: mechGroup.rotation.y + Math.PI * 2, duration: 0.6 });
+                showToast("Mini Mech Robot jumped with joy!");
+            });
+
+            // --- H. ORANGE CONNECTING CABLES ON DESK ---
+            const cablePaths = [
+                [new THREE.Vector3(1.8, 0.12, 2.5), new THREE.Vector3(1.9, 0.12, 1.8), new THREE.Vector3(1.1, 0.18, 1.2)],
+                [new THREE.Vector3(3.4, 0.12, 2.9), new THREE.Vector3(3.8, 0.12, 3.4), new THREE.Vector3(2.8, 0.15, 3.4)],
+                [new THREE.Vector3(-1.3, 0.12, 3.6), new THREE.Vector3(-1.5, 0.12, 2.8), new THREE.Vector3(-1.4, 0.15, 2.1)],
+                [new THREE.Vector3(-3.2, 0.8, -0.3), new THREE.Vector3(-4.5, 0.2, -0.6), new THREE.Vector3(-6.2, 0.1, -0.2)]
+            ];
+
+            cablePaths.forEach((pts) => {
+                const curve = new THREE.CatmullRomCurve3(pts);
+                const tubeGeo = new THREE.TubeGeometry(curve, 24, 0.045, 8, false);
+                const cable = new THREE.Mesh(tubeGeo, mats.retroOrange);
+                cable.castShadow = true;
+                scene.add(cable);
+            });
+        }
+
+        // ============================================================================
+        // 11. SCREEN MODE SWITCHING & CAMERA PRESETS
+        // ============================================================================
+        function setScreenMode(mode) {
+            state.screenMode = mode;
+            sfx.playSwitch(true);
+            ['cat', 'terminal', 'game'].forEach((m) => {
+                const btn = document.getElementById(`mode-${m}`);
+                if (btn) btn.classList.toggle('active', m === mode);
+            });
+            const titles = {
+                cat: 'SUPER CAT OS v4.0',
+                terminal: 'GAMEBOY WORDPAD',
+                game: 'RETRO SNAKE 1994'
+            };
+            state.activeCartridgeTitle = titles[mode];
+            showToast(`Switched CRT Screen to ${titles[mode]}`);
+        }
+
+        function cycleScreenMode() {
+            const order = ['cat', 'terminal', 'game'];
+            const next = order[(order.indexOf(state.screenMode) + 1) % order.length];
+            setScreenMode(next);
+        }
+
+        function moveCamera(preset) {
+            sfx.playSwitch(true);
+            ['overview', 'monitor', 'keyboard', 'fanclock', 'arcade'].forEach((id) => {
+                const btn = document.getElementById(`cam-${id}`);
+                if (btn) btn.classList.toggle('active', id === preset);
+            });
+            const presets = {
+                overview: { pos: { x: -7.2, y: 8.8, z: 13.2 }, target: { x: 0.3, y: 2.2, z: 0.5 } },
+                monitor:  { pos: { x: -0.9, y: 3.9, z: 5.5 },  target: { x: -0.9, y: 3.5, z: 0.5 } },
+                keyboard: { pos: { x: 1.3, y: 4.1, z: 6.8 },   target: { x: 0.9, y: 0.4, z: 3.4 } },
+                fanclock: { pos: { x: 3.4, y: 3.4, z: 4.8 },   target: { x: 3.3, y: 1.6, z: -0.9 } },
+                arcade:   { pos: { x: -4.2, y: 3.8, z: 7.8 },  target: { x: -2.2, y: 0.6, z: 3.2 } }
+            };
+            const p = presets[preset] || presets.overview;
+            gsap.to(camera.position, { x: p.pos.x, y: p.pos.y, z: p.pos.z, duration: 1.1, ease: "power3.out" });
+            gsap.to(controls.target, { x: p.target.x, y: p.target.y, z: p.target.z, duration: 1.1, ease: "power3.out" });
+        }
+
+        // ============================================================================
+        // 12. RAYCASTING INTERACTIVITY & CUSTOM HAND/POINTER CURSOR
+        // ============================================================================
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const customCursor = document.getElementById('custom-cursor');
+        const cursorArrow = document.getElementById('cursor-arrow');
+        const cursorHand = document.getElementById('cursor-hand');
+        let hoveredObj = null;
+        let pointerDownPos = { x: 0, y: 0 };
+
+        window.addEventListener('pointermove', (e) => {
+            // Move custom SVG cursor smoothly
+            if (customCursor) {
+                customCursor.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
+            }
+
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            const isOverUI = Boolean(e.target.closest('button'));
+
+            raycaster.setFromCamera(mouse, camera);
+            const hits = isOverUI ? [] : raycaster.intersectObjects(interactables, false);
+
+            if (hits.length > 0 || isOverUI) {
+                hoveredObj = hits.length > 0 ? hits[0].object : null;
+                customCursor.classList.add('cursor-hover');
+                cursorArrow.classList.add('hidden');
+                cursorHand.classList.remove('hidden');
+            } else {
+                hoveredObj = null;
+                customCursor.classList.remove('cursor-hover');
+                cursorArrow.classList.remove('hidden');
+                cursorHand.classList.add('hidden');
+            }
+        });
+
+        window.addEventListener('pointerdown', (e) => {
+            pointerDownPos = { x: e.clientX, y: e.clientY };
+            if (customCursor) customCursor.classList.add('cursor-click');
+        });
+
+        window.addEventListener('pointerup', (e) => {
+            if (customCursor) customCursor.classList.remove('cursor-click');
+            const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+            if (dist < 6 && hoveredObj && hoveredObj.userData.onClick) {
+                hoveredObj.userData.onClick();
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // ============================================================================
+        // 13. INITIALIZE SCENE & START ANIMATION LOOP
+        // ============================================================================
+        createEnvironment();
+        createSuperGameboyPC();
+        createMechanicalKeyboard();
+        createDeskAccessories();
+
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const elapsed = clock.getElapsedTime();
+
+            controls.update();
+
+            // Smoothly Spin 12-Blade Desk Fan Rotor based on 4 Speed Settings (0=Off, 1=Low, 2=Med, 3=Turbo)
+            if (fanBladesGroup && state.fanSpeed > 0) {
+                const speeds = [0, 0.09, 0.20, 0.36];
+                fanBladesGroup.rotation.z -= speeds[state.fanSpeed];
+            }
+
+            // Render dynamic CRT Canvas
+            drawCRT(elapsed);
+
+            renderer.render(scene, camera);
+        }
+
+        window.onload = function () {
+            animate();
+        };
+    </script>
+</body>
+</html>

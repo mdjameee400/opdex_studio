@@ -1,0 +1,1785 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D Interactive Bento UI Dashboard</title>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-canvas: #c5c6c8;
+            --card-black: #050505;
+            --card-white: #ffffff;
+            --accent-blue: #2b99ff;
+            --accent-green: #32f078;
+            --accent-pink: #f872e2;
+            --accent-red: #f03e36;
+            --accent-orange: #ff9f0a;
+            --accent-yellow: #f5b418;
+            --scene-brightness: 1;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-canvas);
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            transition: background-color 0.5s cubic-bezier(0.22, 1, 0.36, 1), filter 0.3s ease;
+            position: relative;
+        }
+
+        body.sleep-mode {
+            background-color: #1a1b1f;
+        }
+
+        #webgl-bg {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .stage-wrapper {
+            position: relative;
+            z-index: 10;
+            padding: 36px 24px;
+            perspective: 1400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            filter: brightness(var(--scene-brightness));
+            transition: filter 0.2s ease;
+        }
+
+        .bento-board {
+            display: grid;
+            grid-template-columns: 162px 162px 176px 162px 190px;
+            grid-template-rows: 162px 162px 162px;
+            gap: 24px;
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @media (max-width: 980px) {
+            .bento-board {
+                transform: scale(0.82);
+                transform-origin: center center;
+            }
+        }
+
+        @media (max-width: 780px) {
+            .bento-board {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                max-width: 540px;
+                transform: none;
+            }
+        }
+
+        .bento-item {
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease;
+            will-change: transform;
+        }
+
+        .surface-black {
+            background: radial-gradient(130% 130% at var(--mx, 30%) var(--my, 20%),
+                    #1b1c20 0%,
+                    #070708 50%,
+                    #020202 100%);
+            box-shadow:
+                0 14px 28px -8px rgba(0, 0, 0, 0.28),
+                0 4px 10px -2px rgba(0, 0, 0, 0.18),
+                inset 0 1px 1px rgba(255, 255, 255, 0.14),
+                inset 0 -1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        .surface-white {
+            background: radial-gradient(130% 130% at var(--mx, 30%) var(--my, 20%),
+                    #ffffff 0%,
+                    #f9f9fb 65%,
+                    #f0f1f4 100%);
+            color: #050505;
+            box-shadow:
+                0 14px 28px -8px rgba(0, 0, 0, 0.15),
+                0 4px 10px -2px rgba(0, 0, 0, 0.08),
+                inset 0 1.5px 2px rgba(255, 255, 255, 0.95),
+                inset 0 -1px 2px rgba(0, 0, 0, 0.06);
+        }
+
+        .specular-glare {
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            pointer-events: none;
+            background: radial-gradient(circle 130px at var(--px, -200px) var(--py, -200px),
+                    rgba(255, 255, 255, 0.13),
+                    transparent 70%);
+            z-index: 30;
+            mix-blend-mode: screen;
+        }
+
+        .surface-white .specular-glare {
+            background: radial-gradient(circle 140px at var(--px, -200px) var(--py, -200px),
+                    rgba(255, 255, 255, 0.7),
+                    transparent 70%);
+            mix-blend-mode: overlay;
+        }
+
+        .card-rect {
+            border-radius: 30px;
+        }
+
+        .card-circle {
+            border-radius: 50%;
+        }
+
+        .card-pill {
+            border-radius: 9999px;
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        @keyframes bell-ring {
+
+            0%,
+            100% {
+                transform: rotate(0deg);
+            }
+
+            20% {
+                transform: rotate(18deg);
+            }
+
+            40% {
+                transform: rotate(-16deg);
+            }
+
+            60% {
+                transform: rotate(10deg);
+            }
+
+            80% {
+                transform: rotate(-8deg);
+            }
+        }
+
+        .animate-bell {
+            animation: bell-ring 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+        }
+
+        @keyframes pulse-rec {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+                box-shadow: 0 0 0 0 rgba(240, 62, 54, 0.7);
+            }
+
+            50% {
+                transform: scale(1.12);
+                opacity: 0.85;
+                box-shadow: 0 0 12px 4px rgba(240, 62, 54, 0.45);
+            }
+        }
+
+        .recording-active {
+            animation: pulse-rec 1.2s infinite ease-in-out;
+        }
+
+        .wallet-card {
+            transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.35s ease;
+            box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.35);
+        }
+
+        #wallet-widget:hover .wallet-card-1 {
+            transform: translateY(-6px) rotate(-3deg) scale(1.02);
+        }
+
+        #wallet-widget:hover .wallet-card-2 {
+            transform: translateY(-3px) rotate(1.5deg) scale(1.01);
+        }
+
+        #wallet-widget:hover .wallet-card-3 {
+            transform: translateY(2px) scale(1.02);
+        }
+
+        .hud-bar {
+            position: fixed;
+            bottom: 16px;
+            right: 18px;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(10, 10, 12, 0.78);
+            backdrop-filter: blur(12px);
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            font-size: 11px;
+            color: #d1d5db;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .hud-btn {
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.15s ease;
+        }
+
+        .hud-btn:hover {
+            background: rgba(255, 255, 255, 0.18);
+        }
+
+        .hud-btn.active {
+            background: #2b99ff;
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body>
+
+    <canvas id="webgl-bg"></canvas>
+
+    <div class="stage-wrapper" id="stage-wrapper">
+        <div class="bento-board" id="bento-board">
+
+            <div class="bento-item surface-black card-circle w-[162px] h-[162px] cursor-pointer overflow-hidden"
+                id="clock-widget" style="grid-column: 1; grid-row: 1;"
+                title="Click to toggle Live Local Time vs Design Time (10:09)">
+                <canvas id="clock-canvas" width="324" height="324" class="w-full h-full"></canvas>
+                <div class="specular-glare"></div>
+            </div>
+
+            <div class="w-[162px] h-[162px] flex justify-between items-stretch" style="grid-column: 2; grid-row: 1;">
+                
+                <div class="bento-item card-pill w-[72px] h-[162px] overflow-hidden cursor-ns-resize relative select-none"
+                    id="brightness-slider"
+                    style="background: #050505; box-shadow: 0 12px 24px -6px rgba(0,0,0,0.22), inset 0 1px 1px rgba(255,255,255,0.15);"
+                    title="Drag vertically to adjust brightness">
+                    
+                    <div id="brightness-fill" class="w-full bg-white transition-all duration-75" style="height: 77%;">
+                    </div>
+                    
+                    <div class="absolute top-[28px] left-0 right-0 flex justify-center pointer-events-none">
+                        <svg id="brightness-icon" width="28" height="28" viewBox="0 0 24 24" fill="none"
+                            class="transition-transform duration-300">
+                            <circle cx="12" cy="12" r="4.2" fill="#050505" />
+                            <path
+                                d="M12 3V5.2M12 18.8V21M3 12H5.2M18.8 12H21M5.64 5.64L7.2 7.2M16.8 16.8L18.36 18.36M18.36 5.64L16.8 7.2M7.2 16.8L5.64 18.36"
+                                stroke="#050505" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                    </div>
+                    <div class="specular-glare"></div>
+                </div>
+
+                <div class="flex flex-col justify-between w-[72px] h-[162px]">
+                    
+                    <button type="button" id="moon-btn"
+                        class="bento-item surface-black card-circle w-[72px] h-[72px] flex items-center justify-center cursor-pointer focus:outline-none"
+                        title="Toggle Ambient Night Mode">
+                        <svg id="moon-svg" width="22" height="22" viewBox="0 0 24 24"
+                            class="transition-transform duration-300">
+                            <path d="M20.5 14.8A8.5 8.5 0 0 1 9.2 3.5a8.5 8.5 0 1 0 11.3 11.3z" fill="#ffffff" />
+                        </svg>
+                        <div class="specular-glare"></div>
+                    </button>
+
+                    <button type="button" id="signal-btn"
+                        class="bento-item surface-black card-circle w-[72px] h-[72px] flex items-center justify-center cursor-pointer focus:outline-none"
+                        title="Click to cycle signal bars">
+                        <div class="flex items-end gap-[3.5px] h-[16px]" id="signal-bars">
+                            <span class="w-[3.5px] h-[5px] rounded-full bg-white transition-all duration-200"></span>
+                            <span class="w-[3.5px] h-[8.5px] rounded-full bg-white transition-all duration-200"></span>
+                            <span class="w-[3.5px] h-[12px] rounded-full bg-white transition-all duration-200"></span>
+                            <span
+                                class="w-[3.5px] h-[16px] rounded-full bg-[#464649] transition-all duration-200"></span>
+                        </div>
+                        <div class="specular-glare"></div>
+                    </button>
+                </div>
+            </div>
+
+            <div class="bento-item surface-black card-rect w-[362px] h-[162px] p-[20px] flex flex-col justify-between overflow-hidden cursor-pointer"
+                id="weather-widget" style="grid-column: 3 / span 2; grid-row: 1;"
+                title="Click forecast days or temperature to switch °F / °C">
+                
+                <div class="flex items-center gap-[18px]">
+                    <div class="relative w-[78px] h-[64px] flex-shrink-0">
+                        <canvas id="weather-canvas" width="156" height="128" class="w-full h-full"></canvas>
+                    </div>
+                    <div class="flex flex-col">
+                        <div class="flex items-baseline gap-2">
+                            <span id="weather-temp"
+                                class="text-[31px] font-medium tracking-tight text-white leading-none">79°F</span>
+                        </div>
+                        <span id="weather-desc"
+                            class="text-[12.5px] text-[#8e8e93] font-normal mt-[6px] tracking-[-0.01em]">Partly Cloudy
+                            with Light Rain</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-5 gap-2 pt-1 text-center" id="forecast-row">
+                    
+                    <div class="forecast-day flex flex-col items-center gap-[5px] py-1 rounded-xl hover:bg-white/5 transition"
+                        data-day="MON" data-temp="79" data-desc="Partly Cloudy with Light Rain" data-type="partly">
+                        <span class="text-[9px] font-medium tracking-wider text-[#7c7c82]">MON</span>
+                        <div class="h-[22px] flex items-center justify-center">
+                            <svg width="28" height="20" viewBox="0 0 28 20">
+                                <circle cx="9" cy="8" r="5" fill="#ff9f0a" />
+                                <path d="M9 17h11.5a4.5 4.5 0 0 0 .6-8.96A6 6 0 0 0 9.4 6.5 4.5 4.5 0 0 0 9 17z"
+                                    fill="#ffffff" />
+                            </svg>
+                        </div>
+                    </div>
+                    
+                    <div class="forecast-day flex flex-col items-center gap-[5px] py-1 rounded-xl hover:bg-white/5 transition"
+                        data-day="TUE" data-temp="74" data-desc="Scattered Showers" data-type="rain">
+                        <span class="text-[9px] font-medium tracking-wider text-[#7c7c82]">TUE</span>
+                        <div class="h-[22px] flex items-center justify-center">
+                            <svg width="28" height="22" viewBox="0 0 28 22">
+                                <path d="M8 15h12a4.2 4.2 0 0 0 .5-8.37A5.6 5.6 0 0 0 8.5 5.2 4.2 4.2 0 0 0 8 15z"
+                                    fill="#ffffff" />
+                                <path d="M10 17.5l-1.2 2.5M14 17.5l-1.2 2.5M18 17.5l-1.2 2.5" stroke="#2b99ff"
+                                    stroke-width="1.5" stroke-linecap="round" />
+                            </svg>
+                        </div>
+                    </div>
+                    
+                    <div class="forecast-day flex flex-col items-center gap-[5px] py-1 rounded-xl hover:bg-white/5 transition"
+                        data-day="WED" data-temp="72" data-desc="Light Rain & Breeze" data-type="rain">
+                        <span class="text-[9px] font-medium tracking-wider text-[#7c7c82]">WED</span>
+                        <div class="h-[22px] flex items-center justify-center">
+                            <svg width="28" height="22" viewBox="0 0 28 22">
+                                <path d="M8 15h12a4.2 4.2 0 0 0 .5-8.37A5.6 5.6 0 0 0 8.5 5.2 4.2 4.2 0 0 0 8 15z"
+                                    fill="#ffffff" />
+                                <path d="M10 17.5l-1.2 2.5M14 17.5l-1.2 2.5M18 17.5l-1.2 2.5" stroke="#2b99ff"
+                                    stroke-width="1.5" stroke-linecap="round" />
+                            </svg>
+                        </div>
+                    </div>
+                    
+                    <div class="forecast-day flex flex-col items-center gap-[5px] py-1 rounded-xl hover:bg-white/5 transition"
+                        data-day="THU" data-temp="81" data-desc="Mostly Sunny & Warm" data-type="partly">
+                        <span class="text-[9px] font-medium tracking-wider text-[#7c7c82]">THU</span>
+                        <div class="h-[22px] flex items-center justify-center">
+                            <svg width="28" height="20" viewBox="0 0 28 20">
+                                <circle cx="9" cy="8" r="5" fill="#ff9f0a" />
+                                <path d="M9 17h11.5a4.5 4.5 0 0 0 .6-8.96A6 6 0 0 0 9.4 6.5 4.5 4.5 0 0 0 9 17z"
+                                    fill="#ffffff" />
+                            </svg>
+                        </div>
+                    </div>
+                    
+                    <div class="forecast-day flex flex-col items-center gap-[5px] py-1 rounded-xl hover:bg-white/5 transition"
+                        data-day="FRI" data-temp="86" data-desc="Clear Golden Sunshine" data-type="sunny">
+                        <span class="text-[9px] font-medium tracking-wider text-[#7c7c82]">FRI</span>
+                        <div class="h-[22px] flex items-center justify-center">
+                            <svg width="22" height="20" viewBox="0 0 22 20">
+                                <circle cx="11" cy="10" r="6.5" fill="#ff9f0a" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="specular-glare"></div>
+            </div>
+
+            <div class="w-[190px] h-[348px] flex flex-col justify-between"
+                style="grid-column: 5; grid-row: 1 / span 2;">
+                
+                <div class="bento-item surface-white card-rect w-[190px] h-[260px] flex flex-col justify-between items-center pb-[20px] overflow-hidden relative"
+                    id="music-widget">
+                    
+                    <div class="w-[190px] h-[96px] relative overflow-hidden flex justify-center">
+                        <canvas id="vinyl-canvas" width="380" height="192"
+                            class="w-[190px] h-[96px] cursor-grab active:cursor-grabbing"></canvas>
+                    </div>
+
+                    <div class="text-center mt-[2px] px-3">
+                        <div id="track-title"
+                            class="text-[13.5px] font-semibold text-[#050505] tracking-[-0.01em] leading-tight">Neon
+                            Horizon</div>
+                        <div id="track-artist" class="text-[11.5px] font-normal text-[#8e8e93] mt-[3px]">Koë</div>
+                    </div>
+
+                    <div class="flex items-center justify-center gap-[20px] my-[4px]">
+                        
+                        <button type="button" id="music-prev"
+                            class="text-[#050505] hover:opacity-70 active:scale-90 transition p-1"
+                            title="Previous Track">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M6 5h2.5v14H6V5zm4.5 7 9.5 7V5l-9.5 7z" />
+                            </svg>
+                        </button>
+                        
+                        <button type="button" id="music-toggle"
+                            class="w-[38px] h-[38px] rounded-full bg-[#050505] text-white flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition"
+                            title="Play / Pause Synthwave Audio">
+                            <svg id="music-pause-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <rect x="6.5" y="5" width="4" height="14" rx="1" />
+                                <rect x="13.5" y="5" width="4" height="14" rx="1" />
+                            </svg>
+                            <svg id="music-play-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"
+                                class="hidden ml-[2px]">
+                                <path d="M7 5v14l12-7z" />
+                            </svg>
+                        </button>
+                        
+                        <button type="button" id="music-next"
+                            class="text-[#050505] hover:opacity-70 active:scale-90 transition p-1" title="Next Track">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M15.5 5H18v14h-2.5V5zM6 19l9.5-7L6 5v14z" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="w-full px-[24px]">
+                        <div id="music-progress-Wrap"
+                            class="w-full h-[5px] bg-[#ececef] rounded-full overflow-hidden cursor-pointer relative">
+                            <div id="music-progress-bar"
+                                class="h-full bg-[#2b99ff] rounded-full transition-all duration-150"
+                                style="width: 28%;"></div>
+                        </div>
+                    </div>
+                    <div class="specular-glare"></div>
+                </div>
+
+                <button type="button" id="sleep-mode-btn"
+                    class="bento-item surface-black card-pill w-[190px] h-[70px] px-[26px] flex items-center gap-[14px] cursor-pointer focus:outline-none group"
+                    title="Toggle Sleep Mode">
+                    
+                    <svg width="26" height="20" viewBox="0 0 28 22" fill="none"
+                        class="flex-shrink-0 transition-transform duration-300 group-hover:scale-105">
+                        <path d="M3 11V6a2 2 0 0 1 2-2h18a2 2 0 0 1 2 2v5" stroke="#ffffff" stroke-width="2"
+                            stroke-linecap="round" />
+                        <path
+                            d="M6.5 11V8.5A1.5 1.5 0 0 1 8 7h4a1.5 1.5 0 0 1 1.5 1.5V11M14.5 11V8.5A1.5 1.5 0 0 1 16 7h4a1.5 1.5 0 0 1 1.5 1.5V11"
+                            fill="#ffffff" />
+                        <path d="M2 11h24a1 1 0 0 1 1 1v4H1v-4a1 1 0 0 1 1-1z" fill="#ffffff" />
+                        <path d="M3 16v3M25 16v3" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" />
+                    </svg>
+                    <span id="sleep-mode-label"
+                        class="text-[12.5px] font-normal text-[#a0a0a6] group-hover:text-white transition-colors">Sleep
+                        Mode</span>
+                    <div class="specular-glare"></div>
+                </button>
+            </div>
+
+            <div class="w-[162px] h-[162px] flex justify-between items-stretch" style="grid-column: 1; grid-row: 2;">
+                
+                <div class="bento-item card-pill w-[72px] h-[162px] overflow-hidden cursor-ns-resize relative select-none"
+                    id="volume-slider"
+                    style="background: #050505; box-shadow: 0 12px 24px -6px rgba(0,0,0,0.22), inset 0 1px 1px rgba(255,255,255,0.15);"
+                    title="Drag vertically to adjust synth volume">
+                    
+                    <div id="volume-fill" class="w-full bg-white transition-all duration-75" style="height: 52%;"></div>
+                    
+                    <div class="absolute top-[28px] left-0 right-0 flex justify-center pointer-events-none">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="#050505">
+                            <path
+                                d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                        </svg>
+                    </div>
+                    <div class="specular-glare"></div>
+                </div>
+
+                <div class="flex flex-col justify-between w-[72px] h-[162px]">
+                    
+                    <button type="button" id="bell-btn"
+                        class="bento-item surface-white card-circle w-[72px] h-[72px] flex items-center justify-center cursor-pointer focus:outline-none"
+                        title="Ring Notification Chime">
+                        <svg id="bell-svg" width="22" height="22" viewBox="0 0 24 24" fill="#050505">
+                            <path
+                                d="M12 22c1.1 0 2-.9 2-2h-4a2 2 0 0 0 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+                        </svg>
+                        <div class="specular-glare"></div>
+                    </button>
+
+                    <button type="button" id="record-btn"
+                        class="bento-item surface-black card-circle w-[72px] h-[72px] flex items-center justify-center cursor-pointer focus:outline-none"
+                        title="Toggle Live Audio Waveform Recording">
+                        <div
+                            class="w-[30px] h-[30px] rounded-full border-[3.5px] border-[#262629] flex items-center justify-center">
+                            <div id="record-dot"
+                                class="w-[12px] h-[12px] rounded-full bg-[#f03e36] transition-transform duration-200">
+                            </div>
+                        </div>
+                        <div class="specular-glare"></div>
+                    </button>
+                </div>
+            </div>
+
+            <div class="bento-item surface-black card-rect w-[162px] h-[162px] p-[18px] flex flex-col justify-between items-center cursor-pointer"
+                id="battery-widget" style="grid-column: 2; grid-row: 2;"
+                title="Click battery cells to set level or toggle fast charging">
+                <div class="text-center mt-[2px]">
+                    <div id="battery-status"
+                        class="text-[8.5px] font-medium tracking-[0.12em] text-[#8e8e93] uppercase">CHARGING...</div>
+                    <div id="battery-percent" class="text-[28px] font-normal text-white leading-tight mt-[3px]">25%
+                    </div>
+                </div>
+
+                <div class="w-full h-[58px] bg-[#1a1a1c] rounded-[16px] p-[6px] grid grid-cols-5 gap-[5px] items-stretch"
+                    id="battery-cells">
+                    <div class="battery-cell rounded-[9px] bg-[#32f078] shadow-[0_0_12px_rgba(50,240,120,0.35)] transition-all duration-300"
+                        data-level="20"></div>
+                    <div class="battery-cell rounded-[9px] bg-[#32f078] shadow-[0_0_12px_rgba(50,240,120,0.35)] transition-all duration-300"
+                        data-level="40"></div>
+                    <div class="battery-cell rounded-[9px] bg-[#2c2c2e] transition-all duration-300" data-level="60">
+                    </div>
+                    <div class="battery-cell rounded-[9px] bg-[#2c2c2e] transition-all duration-300" data-level="80">
+                    </div>
+                    <div class="battery-cell rounded-[9px] bg-[#2c2c2e] transition-all duration-300" data-level="100">
+                    </div>
+                </div>
+                <div class="specular-glare"></div>
+            </div>
+
+            <div class="w-[176px] h-[162px] flex flex-col justify-between" style="grid-column: 3; grid-row: 2;">
+                
+                <div class="bento-item surface-black card-pill w-[176px] h-[72px] p-[7px] flex items-center justify-between cursor-pointer relative"
+                    id="power-switch" title="Toggle Switch">
+                    
+                    <div id="switch-thumb"
+                        class="w-[78px] h-[58px] rounded-full bg-white shadow-md transition-transform duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) z-10">
+                    </div>
+                    
+                    <div class="absolute inset-0 flex items-center justify-between px-[28px] pointer-events-none z-20">
+                        <span id="switch-label-off"
+                            class="text-[12.5px] font-medium text-[#050505] transition-colors duration-200">OFF</span>
+                        <span id="switch-label-on"
+                            class="text-[12.5px] font-medium text-[#7c7c82] transition-colors duration-200">ON</span>
+                    </div>
+                    <div class="specular-glare"></div>
+                </div>
+
+                <div class="bento-item surface-white card-pill w-[176px] h-[72px] px-[14px] flex items-center gap-[10px] overflow-hidden relative"
+                    id="waveform-widget" title="Click Play/Pause or scrub the red playhead">
+                    
+                    <button type="button" id="wave-toggle-btn"
+                        class="w-[42px] h-[42px] rounded-full border-[2px] border-[#050505] flex items-center justify-center flex-shrink-0 text-[#050505] hover:bg-black/5 active:scale-95 transition">
+                        <svg id="wave-pause-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="6" y="5" width="4" height="14" rx="1" />
+                            <rect x="14" y="5" width="4" height="14" rx="1" />
+                        </svg>
+                        <svg id="wave-play-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"
+                            class="hidden ml-[1px]">
+                            <path d="M7 5v14l12-7z" />
+                        </svg>
+                    </button>
+
+                    <div class="relative flex-1 h-full flex items-center cursor-ew-resize" id="wave-scrub-area">
+                        <canvas id="wave-canvas" width="200" height="120" class="w-full h-[60px]"></canvas>
+                        
+                        <div id="wave-playhead"
+                            class="absolute top-[11px] bottom-[9px] w-[1.5px] bg-[#f03e36] pointer-events-none transition-all duration-75"
+                            style="left: 14%;">
+                            <div class="w-[7px] h-[7px] rounded-full bg-[#f03e36] -ml-[2.75px] -mt-[2px]"></div>
+                        </div>
+                    </div>
+                    <div class="specular-glare"></div>
+                </div>
+            </div>
+
+            <div class="bento-item surface-black card-circle w-[162px] h-[162px] cursor-grab active:cursor-grabbing overflow-hidden"
+                id="compass-widget" style="grid-column: 4; grid-row: 2;"
+                title="Drag or move cursor to rotate 3D magnetic compass">
+                <canvas id="compass-canvas" width="324" height="324" class="w-full h-full"></canvas>
+                <div class="specular-glare"></div>
+            </div>
+
+            <div class="bento-item surface-black card-rect w-[162px] h-[162px] p-[18px] flex flex-col justify-between"
+                id="todo-widget" style="grid-column: 1; grid-row: 3;">
+                
+                <div class="flex items-center justify-between">
+                    <span class="text-[12px] font-normal text-[#8e8e93]">Today</span>
+                    <span id="todo-count" class="text-[16px] font-medium text-white leading-none">6</span>
+                </div>
+
+                <div class="flex flex-col gap-[9px] my-auto pt-[4px]" id="todo-list">
+                    
+                    <label class="flex items-center gap-[9px] cursor-pointer group" data-index="0">
+                        <span
+                            class="todo-box w-[16px] h-[16px] rounded-[5px] bg-[#f872e2] flex items-center justify-center transition-all duration-200">
+                            <svg class="todo-check w-[10px] h-[10px] text-white opacity-100 transition-opacity duration-150"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                        </span>
+                        <span class="todo-text text-[11.5px] text-[#7c7c82] transition-colors duration-200">Order
+                            food</span>
+                    </label>
+
+                    <label class="flex items-center gap-[9px] cursor-pointer group" data-index="1">
+                        <span
+                            class="todo-box w-[16px] h-[16px] rounded-[5px] bg-[#1e1e21] border border-[#2e2e32] flex items-center justify-center transition-all duration-200">
+                            <svg class="todo-check w-[10px] h-[10px] text-white opacity-0 transition-opacity duration-150"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                        </span>
+                        <span class="todo-text text-[11.5px] text-[#e5e5ea] transition-colors duration-200">Clean the
+                            dishes</span>
+                    </label>
+
+                    <label class="flex items-center gap-[9px] cursor-pointer group" data-index="2">
+                        <span
+                            class="todo-box w-[16px] h-[16px] rounded-[5px] bg-[#1e1e21] border border-[#2e2e32] flex items-center justify-center transition-all duration-200">
+                            <svg class="todo-check w-[10px] h-[10px] text-white opacity-0 transition-opacity duration-150"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                        </span>
+                        <span class="todo-text text-[11.5px] text-[#e5e5ea] transition-colors duration-200">Wind
+                            down</span>
+                    </label>
+                </div>
+
+                <div class="w-full h-[6px] bg-[#222225] rounded-full overflow-hidden">
+                    <div id="todo-progress" class="h-full bg-[#f872e2] rounded-full transition-all duration-300"
+                        style="width: 30%;"></div>
+                </div>
+                <div class="specular-glare"></div>
+            </div>
+
+            <div class="bento-item surface-black card-circle w-[162px] h-[162px] overflow-hidden cursor-pointer relative flex flex-col items-center"
+                id="water-widget" style="grid-column: 2; grid-row: 3;"
+                title="Click to log +250ml hydration or move cursor to slosh water">
+                <canvas id="water-canvas" width="324" height="324"
+                    class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+                <div class="relative z-10 text-center mt-[28px] pointer-events-none">
+                    <div class="text-[8px] font-medium tracking-[0.1em] text-[#8e8e93] uppercase">WATER INTAKE</div>
+                    <div id="water-amount" class="text-[20px] font-normal text-white mt-[2px]">250ml</div>
+                </div>
+                <div class="specular-glare"></div>
+            </div>
+
+            <div class="bento-item surface-black card-rect w-[162px] h-[162px] p-[14px] flex flex-col justify-between overflow-hidden cursor-pointer relative"
+                id="wallet-widget" style="width: 162px; justify-self: start; grid-column: 3; grid-row: 3;"
+                title="Click to cycle active card & balance">
+                
+                <div class="relative w-full h-[90px] rounded-t-[18px] overflow-hidden pt-[2px]">
+                    
+                    <div id="card-blue"
+                        class="wallet-card wallet-card-1 absolute left-0 right-0 top-[0px] h-[64px] rounded-[14px] bg-[#2b99ff]">
+                    </div>
+                    
+                    <div id="card-yellow"
+                        class="wallet-card wallet-card-2 absolute left-0 right-0 top-[16px] h-[64px] rounded-[14px] bg-[#f5b418]">
+                    </div>
+                    
+                    <div id="card-red"
+                        class="wallet-card wallet-card-3 absolute left-0 right-0 top-[33px] h-[64px] rounded-[14px] bg-[#d93831] px-[14px] pt-[16px] flex justify-between items-start">
+                        
+                        <div class="w-[26px] h-[16px] rounded-[4px] bg-[#e36964]/75"></div>
+                        
+                        <div class="flex items-center">
+                            <div class="w-[15px] h-[15px] rounded-full bg-[#e36964]/75"></div>
+                            <div class="w-[15px] h-[15px] rounded-full bg-[#e36964]/75 -ml-[6px]"></div>
+                        </div>
+                    </div>
+
+                    <svg viewBox="0 0 134 32"
+                        class="absolute -bottom-[2px] left-0 right-0 w-full h-[28px] z-20 pointer-events-none"
+                        preserveAspectRatio="none">
+                        <path d="M0 32 L0 26 Q14 4 30 4 L104 4 Q120 4 134 26 L134 32 Z" fill="#050505" />
+                    </svg>
+                </div>
+
+                <div class="px-[4px] pb-[2px] z-20">
+                    <div id="wallet-label" class="text-[8px] font-medium tracking-[0.08em] text-[#7c7c82] uppercase">
+                        BALANCE</div>
+                    <div id="wallet-balance" class="text-[19px] font-normal text-white leading-tight mt-[1px]">$94,100
+                    </div>
+                </div>
+                <div class="specular-glare"></div>
+            </div>
+
+            <div class="bento-item surface-white card-rect h-[162px] p-[18px] flex justify-between relative overflow-hidden"
+                id="calendar-widget" style="width: 390px; margin-left: -14px; grid-column: 4 / span 2; grid-row: 3;">
+                
+                <div class="flex flex-col justify-between py-[2px] pl-[4px] cursor-pointer" id="calendar-date-box"
+                    title="Click to cycle day">
+                    <div>
+                        <div id="cal-weekday" class="text-[12px] font-normal text-[#8e8e93]">Tuesday</div>
+                        <div id="cal-daynum" class="text-[29px] font-normal text-[#050505] leading-tight mt-[1px]">22
+                        </div>
+                    </div>
+                    <div class="text-[11.5px] text-[#8e8e93]">
+                        <strong id="cal-event-count" class="font-semibold text-[#050505]">6</strong> Events
+                    </div>
+                </div>
+
+                <div class="w-[244px] flex flex-col justify-between relative" id="calendar-events-area">
+                    
+                    <div id="calendar-red-line"
+                        class="absolute -left-[22px] -right-[18px] top-[7px] flex items-center z-30 pointer-events-none transition-all duration-300">
+                        <div class="w-[8px] h-[8px] rounded-full bg-[#f03e36] flex-shrink-0"></div>
+                        <div class="w-full h-[1.5px] bg-[#f03e36]"></div>
+                    </div>
+
+                    <div class="cal-event-card w-full h-[58px] rounded-[14px] bg-[#050505] px-[14px] flex flex-col justify-center cursor-pointer hover:bg-[#141417] transition"
+                        data-slot="0" title="Click to move timeline & highlight event">
+                        <div class="text-[12px] font-normal text-white leading-snug" id="event-1-title">Deep Focus
+                            Session</div>
+                        <div class="text-[10px] font-normal text-[#7c7c82] mt-[2px]" id="event-1-time">9:00 AM – 11:00
+                            AM</div>
+                    </div>
+
+                    <div class="cal-event-card w-full h-[58px] rounded-[14px] bg-[#050505] px-[14px] flex flex-col justify-center cursor-pointer hover:bg-[#141417] transition"
+                        data-slot="1" title="Click to move timeline & highlight event">
+                        <div class="text-[12px] font-normal text-white leading-snug" id="event-2-title">Client Sync:
+                            Feedback</div>
+                        <div class="text-[10px] font-normal text-[#7c7c82] mt-[2px]" id="event-2-time">12:30 PM – 1:15
+                            PM</div>
+                    </div>
+                </div>
+                <div class="specular-glare"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="hud-bar">
+        <span>3D WebGL Material:</span>
+        <button type="button" id="toggle-3d-tilt" class="hud-btn active">Interactive Tilt</button>
+        <button type="button" id="toggle-3d-orbit" class="hud-btn">Isometric 3D</button>
+        <button type="button" id="reset-design-btn" class="hud-btn">Reset Exact Reference</button>
+    </div>
+
+    <script>
+        let audioCtx = null;
+        let masterVolume = 0.52;
+        let isMusicPlaying = false;
+        let musicInterval = null;
+        let musicStep = 0;
+
+        function getAudioCtx() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) {
+                    audioCtx = new AudioContextClass();
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        function playTactileClick(freq = 520, duration = 0.035, type = 'sine') {
+            const ctx = getAudioCtx();
+            if (!ctx) return;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(freq * 0.45, ctx.currentTime + duration);
+            gain.gain.setValueAtTime(0.15 * masterVolume, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + duration);
+        }
+
+        function playBellChime() {
+            const ctx = getAudioCtx();
+            if (!ctx) return;
+            const notes = [880, 1318.5, 1760];
+            notes.forEach((n, idx) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(n, ctx.currentTime + idx * 0.06);
+                gain.gain.setValueAtTime(0.22 * masterVolume, ctx.currentTime + idx * 0.06);
+                gain.gain.exponentialRampToValueAtTime(0.0008, ctx.currentTime + idx * 0.06 + 0.65);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(ctx.currentTime + idx * 0.06);
+                osc.stop(ctx.currentTime + idx * 0.06 + 0.65);
+            });
+        }
+
+        const tracks = [
+            { title: 'Neon Horizon', artist: 'Koë', color: '#2b99ff', notes: [261.63, 329.63, 392.00, 523.25, 392.00, 329.63] },
+            { title: 'Obsidian Pulse', artist: 'Aether', color: '#32f078', notes: [220.00, 261.63, 329.63, 440.00, 329.63, 261.63] },
+            { title: 'Velvet Skyline', artist: 'Sora', color: '#f872e2', notes: [293.66, 349.23, 440.00, 587.33, 440.00, 349.23] }
+        ];
+        let currentTrackIdx = 0;
+        let musicProgress = 28;
+
+        function startSynthLoop() {
+            stopSynthLoop();
+            musicInterval = setInterval(() => {
+                if (!isMusicPlaying) return;
+                const ctx = getAudioCtx();
+                if (ctx) {
+                    const track = tracks[currentTrackIdx];
+                    const freq = track.notes[musicStep % track.notes.length];
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+                    gain.gain.setValueAtTime(0.09 * masterVolume, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.28);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.28);
+                }
+                musicStep++;
+                musicProgress = (musicProgress + 1.5) % 100;
+                document.getElementById('music-progress-bar').style.width = musicProgress + '%';
+            }, 320);
+        }
+
+        function stopSynthLoop() {
+            if (musicInterval) {
+                clearInterval(musicInterval);
+                musicInterval = null;
+            }
+        }
+
+        function initWebGLBackground() {
+            const canvas = document.getElementById('webgl-bg');
+            if (!window.THREE || !canvas) return;
+
+            const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.z = 12;
+
+            const particleCount = 70;
+            const geo = new THREE.BufferGeometry();
+            const pos = new Float32Array(particleCount * 3);
+            for (let i = 0; i < particleCount * 3; i += 3) {
+                pos[i] = (Math.random() - 0.5) * 24;
+                pos[i + 1] = (Math.random() - 0.5) * 14;
+                pos[i + 2] = (Math.random() - 0.5) * 6 - 2;
+            }
+            geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+
+            const mat = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 0.06,
+                transparent: true,
+                opacity: 0.0
+            });
+
+            const points = new THREE.Points(geo, mat);
+            scene.add(points);
+
+            window.webglPointsMat = mat;
+
+            let targetX = 0, targetY = 0;
+            window.addEventListener('mousemove', (e) => {
+                targetX = (e.clientX / window.innerWidth - 0.5) * 1.2;
+                targetY = -(e.clientY / window.innerHeight - 0.5) * 1.2;
+            });
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            function animateWebGL() {
+                requestAnimationFrame(animateWebGL);
+                points.rotation.y += 0.0008;
+                points.position.x += (targetX - points.position.x) * 0.05;
+                points.position.y += (targetY - points.position.y) * 0.05;
+                renderer.render(scene, camera);
+            }
+            animateWebGL();
+        }
+
+        let tiltEnabled = true;
+        let isometricMode = false;
+        const board = document.getElementById('bento-board');
+        const items = document.querySelectorAll('.bento-item');
+
+        items.forEach((item) => {
+            item.addEventListener('mousemove', (e) => {
+                const rect = item.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const mx = Math.round((x / rect.width) * 100);
+                const my = Math.round((y / rect.height) * 100);
+
+                item.style.setProperty('--px', `${x}px`);
+                item.style.setProperty('--py', `${y}px`);
+                item.style.setProperty('--mx', `${mx}%`);
+                item.style.setProperty('--my', `${my}%`);
+
+                if (tiltEnabled) {
+                    const rotY = ((x / rect.width) - 0.5) * 10;
+                    const rotX = ((y / rect.height) - 0.5) * -10;
+                    item.style.transform = `perspective(700px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg) translateZ(4px)`;
+                }
+            });
+
+            item.addEventListener('mouseleave', () => {
+                item.style.setProperty('--px', `-200px`);
+                item.style.setProperty('--py', `-200px`);
+                item.style.setProperty('--mx', `30%`);
+                item.style.setProperty('--my', `20%`);
+                item.style.transform = '';
+            });
+        });
+
+        const clockCanvas = document.getElementById('clock-canvas');
+        const clockCtx = clockCanvas.getContext('2d');
+        let clockLiveMode = false;
+
+        document.getElementById('clock-widget').addEventListener('click', () => {
+            clockLiveMode = !clockLiveMode;
+            playTactileClick(clockLiveMode ? 680 : 480);
+        });
+
+        function drawClock() {
+            const w = clockCanvas.width;
+            const h = clockCanvas.height;
+            const cx = w / 2;
+            const cy = h / 2;
+            const radius = w / 2;
+
+            clockCtx.clearRect(0, 0, w, h);
+
+            for (let i = 0; i < 12; i++) {
+                const angle = (i * 30 - 90) * (Math.PI / 180);
+                clockCtx.save();
+                clockCtx.translate(cx, cy);
+                clockCtx.rotate(angle);
+                clockCtx.beginPath();
+                clockCtx.moveTo(radius - 26, 0);
+                clockCtx.lineTo(radius - 14, 0);
+                clockCtx.strokeStyle = '#68686e';
+                clockCtx.lineWidth = 3.5;
+                clockCtx.lineCap = 'round';
+                clockCtx.stroke();
+                clockCtx.restore();
+            }
+
+            clockCtx.save();
+            clockCtx.beginPath();
+            clockCtx.moveTo(cx, cy + 78);
+            clockCtx.lineTo(cx, cy + 96);
+            clockCtx.strokeStyle = '#f03e36';
+            clockCtx.lineWidth = 5.5;
+            clockCtx.lineCap = 'round';
+            clockCtx.stroke();
+            clockCtx.restore();
+
+            let hourAngle, minAngle;
+            if (!clockLiveMode) {
+                hourAngle = (304 - 90) * (Math.PI / 180);
+                minAngle = (58 - 90) * (Math.PI / 180);
+            } else {
+                const now = new Date();
+                const hrs = now.getHours() % 12;
+                const mins = now.getMinutes();
+                const secs = now.getSeconds() + now.getMilliseconds() / 1000;
+                hourAngle = ((hrs + mins / 60) * 30 - 90) * (Math.PI / 180);
+                minAngle = ((mins + secs / 60) * 6 - 90) * (Math.PI / 180);
+
+                const secAngle = (secs * 6 - 90) * (Math.PI / 180);
+                clockCtx.save();
+                clockCtx.translate(cx, cy);
+                clockCtx.rotate(secAngle);
+                clockCtx.beginPath();
+                clockCtx.moveTo(-16, 0);
+                clockCtx.lineTo(radius - 32, 0);
+                clockCtx.strokeStyle = '#f03e36';
+                clockCtx.lineWidth = 2.5;
+                clockCtx.lineCap = 'round';
+                clockCtx.stroke();
+                clockCtx.restore();
+            }
+
+            clockCtx.save();
+            clockCtx.translate(cx, cy);
+            clockCtx.rotate(minAngle);
+            clockCtx.shadowColor = 'rgba(0,0,0,0.6)';
+            clockCtx.shadowBlur = 8;
+            clockCtx.beginPath();
+            clockCtx.moveTo(0, 0);
+            clockCtx.lineTo(96, 0);
+            clockCtx.strokeStyle = '#787880';
+            clockCtx.lineWidth = 8.5;
+            clockCtx.lineCap = 'round';
+            clockCtx.stroke();
+            clockCtx.restore();
+
+            clockCtx.save();
+            clockCtx.translate(cx, cy);
+            clockCtx.rotate(hourAngle);
+            clockCtx.shadowColor = 'rgba(0,0,0,0.6)';
+            clockCtx.shadowBlur = 10;
+            clockCtx.beginPath();
+            clockCtx.moveTo(0, 0);
+            clockCtx.lineTo(74, 0);
+            clockCtx.strokeStyle = '#ffffff';
+            clockCtx.lineWidth = 14;
+            clockCtx.lineCap = 'round';
+            clockCtx.stroke();
+            clockCtx.restore();
+
+            clockCtx.beginPath();
+            clockCtx.arc(cx, cy, 7, 0, Math.PI * 2);
+            clockCtx.fillStyle = '#ffffff';
+            clockCtx.fill();
+
+            requestAnimationFrame(drawClock);
+        }
+        drawClock();
+
+        const brightnessSlider = document.getElementById('brightness-slider');
+        const brightnessFill = document.getElementById('brightness-fill');
+        const brightnessIcon = document.getElementById('brightness-icon');
+        let isDraggingBrightness = false;
+
+        function updateBrightnessFromEvent(e) {
+            const rect = brightnessSlider.getBoundingClientRect();
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            let pct = ((clientY - rect.top) / rect.height) * 100;
+            pct = Math.max(22, Math.min(92, pct));
+            brightnessFill.style.height = `${pct}%`;
+            brightnessIcon.style.transform = `rotate(${pct * 1.8}deg)`;
+            const sceneBright = 0.78 + (pct / 100) * 0.28;
+            document.documentElement.style.setProperty('--scene-brightness', sceneBright.toFixed(2));
+        }
+
+        brightnessSlider.addEventListener('mousedown', (e) => {
+            isDraggingBrightness = true;
+            updateBrightnessFromEvent(e);
+            playTactileClick(600, 0.02);
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (isDraggingBrightness) updateBrightnessFromEvent(e);
+        });
+        window.addEventListener('mouseup', () => {
+            isDraggingBrightness = false;
+        });
+
+        const moonBtn = document.getElementById('moon-btn');
+        const sleepModeBtn = document.getElementById('sleep-mode-btn');
+        const sleepModeLabel = document.getElementById('sleep-mode-label');
+        let isSleepMode = false;
+
+        function toggleSleepMode() {
+            isSleepMode = !isSleepMode;
+            document.body.classList.toggle('sleep-mode', isSleepMode);
+            playTactileClick(isSleepMode ? 380 : 620, 0.06);
+            const moonSvg = document.getElementById('moon-svg');
+            moonSvg.style.transform = isSleepMode ? 'rotate(-25deg) scale(1.12)' : 'rotate(0deg) scale(1)';
+            moonSvg.querySelector('path').setAttribute('fill', isSleepMode ? '#ff9f0a' : '#ffffff');
+            sleepModeLabel.textContent = isSleepMode ? 'Sleep Active' : 'Sleep Mode';
+            sleepModeLabel.style.color = isSleepMode ? '#ffffff' : '#a0a0a6';
+            if (window.webglPointsMat) {
+                window.webglPointsMat.opacity = isSleepMode ? 0.55 : 0.0;
+            }
+        }
+
+        moonBtn.addEventListener('click', toggleSleepMode);
+        sleepModeBtn.addEventListener('click', toggleSleepMode);
+
+        let signalLevel = 3;
+        const signalBtn = document.getElementById('signal-btn');
+        const signalBars = document.querySelectorAll('#signal-bars span');
+        signalBtn.addEventListener('click', () => {
+            signalLevel = (signalLevel % 4) + 1;
+            playTactileClick(450 + signalLevel * 90);
+            signalBars.forEach((bar, idx) => {
+                bar.style.backgroundColor = idx < signalLevel ? '#ffffff' : '#464649';
+            });
+        });
+
+        const weatherCanvas = document.getElementById('weather-canvas');
+        const wCtx = weatherCanvas.getContext('2d');
+        let weatherType = 'partly';
+        let useCelsius = false;
+        let currentTempF = 79;
+        let rainDrops = [
+            { x: 48, y: 98, len: 14, speed: 1.4 },
+            { x: 68, y: 102, len: 14, speed: 1.6 },
+            { x: 88, y: 98, len: 14, speed: 1.3 }
+        ];
+
+        function renderWeatherTemp() {
+            const tempEl = document.getElementById('weather-temp');
+            if (useCelsius) {
+                const c = Math.round((currentTempF - 32) * (5 / 9));
+                tempEl.textContent = `${c}°C`;
+            } else {
+                tempEl.textContent = `${currentTempF}°F`;
+            }
+        }
+
+        document.getElementById('weather-temp').addEventListener('click', (e) => {
+            e.stopPropagation();
+            useCelsius = !useCelsius;
+            playTactileClick(580);
+            renderWeatherTemp();
+        });
+
+        document.querySelectorAll('.forecast-day').forEach((dayEl) => {
+            dayEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                currentTempF = parseInt(dayEl.dataset.temp, 10);
+                weatherType = dayEl.dataset.type;
+                document.getElementById('weather-desc').textContent = dayEl.dataset.desc;
+                renderWeatherTemp();
+                playTactileClick(640);
+            });
+        });
+
+        let sunPulse = 0;
+        function drawWeatherGraphic() {
+            wCtx.clearRect(0, 0, 156, 128);
+            sunPulse += 0.04;
+
+            if (weatherType === 'sunny') {
+                const r = 34 + Math.sin(sunPulse) * 1.5;
+                wCtx.beginPath();
+                wCtx.arc(78, 60, r, 0, Math.PI * 2);
+                wCtx.fillStyle = '#ff9f0a';
+                wCtx.fill();
+            } else {
+                if (weatherType === 'partly') {
+                    wCtx.beginPath();
+                    wCtx.arc(40, 42, 24 + Math.sin(sunPulse) * 1, 0, Math.PI * 2);
+                    wCtx.fillStyle = '#ff9f0a';
+                    wCtx.fill();
+                }
+
+                wCtx.save();
+                wCtx.fillStyle = '#ffffff';
+                wCtx.beginPath();
+                wCtx.arc(54, 62, 22, Math.PI * 0.5, Math.PI * 1.5);
+                wCtx.arc(76, 48, 26, Math.PI * 1.05, Math.PI * 1.92);
+                wCtx.arc(98, 62, 22, Math.PI * 1.5, Math.PI * 0.5);
+                wCtx.closePath();
+                wCtx.fill();
+                wCtx.restore();
+
+                wCtx.strokeStyle = '#2b99ff';
+                wCtx.lineWidth = 3.2;
+                wCtx.lineCap = 'round';
+                rainDrops.forEach((d) => {
+                    d.y += isMusicPlaying ? d.speed : d.speed * 0.35;
+                    if (d.y > 110) d.y = 92;
+                    wCtx.beginPath();
+                    wCtx.moveTo(d.x, d.y);
+                    wCtx.lineTo(d.x - 6, d.y + d.len);
+                    wCtx.stroke();
+                });
+            }
+            requestAnimationFrame(drawWeatherGraphic);
+        }
+        drawWeatherGraphic();
+
+        const vinylCanvas = document.getElementById('vinyl-canvas');
+        const vCtx = vinylCanvas.getContext('2d');
+        let vinylAngle = 0;
+
+        function drawVinyl() {
+            const w = vinylCanvas.width;
+            const h = vinylCanvas.height;
+            const cx = w / 2;
+            const cy = 12;
+            const outerR = 148;
+
+            vCtx.clearRect(0, 0, w, h);
+
+            if (isMusicPlaying) {
+                vinylAngle += 0.025;
+            }
+
+            vCtx.save();
+            vCtx.translate(cx, cy);
+            vCtx.rotate(vinylAngle);
+
+            vCtx.beginPath();
+            vCtx.arc(0, 0, outerR, 0, Math.PI * 2);
+            vCtx.fillStyle = '#08080a';
+            vCtx.fill();
+
+            for (let s = 0; s < 2; s++) {
+                vCtx.save();
+                vCtx.rotate(s * Math.PI + 0.55);
+                vCtx.beginPath();
+                vCtx.moveTo(0, 0);
+                vCtx.arc(0, 0, outerR - 4, -0.38, 0.38);
+                vCtx.closePath();
+                vCtx.fillStyle = 'rgba(255, 255, 255, 0.14)';
+                vCtx.fill();
+                vCtx.restore();
+            }
+
+            const grooveRadii = [58, 74, 90, 106, 122, 138];
+            grooveRadii.forEach((r) => {
+                vCtx.beginPath();
+                vCtx.arc(0, 0, r, 0, Math.PI * 2);
+                vCtx.strokeStyle = '#262629';
+                vCtx.lineWidth = 6.5;
+                vCtx.stroke();
+            });
+
+            for (let s = 0; s < 2; s++) {
+                vCtx.save();
+                vCtx.rotate(s * Math.PI - 0.35);
+                vCtx.beginPath();
+                vCtx.moveTo(0, 0);
+                vCtx.arc(0, 0, outerR, -0.35, 0.35);
+                vCtx.closePath();
+                vCtx.fillStyle = 'rgba(5, 5, 5, 0.72)';
+                vCtx.fill();
+                vCtx.restore();
+            }
+
+            const activeColor = tracks[currentTrackIdx].color;
+            vCtx.beginPath();
+            vCtx.arc(0, 0, 42, 0, Math.PI * 2);
+            vCtx.fillStyle = activeColor;
+            vCtx.fill();
+
+            vCtx.beginPath();
+            vCtx.arc(0, 0, 10, 0, Math.PI * 2);
+            vCtx.fillStyle = '#050505';
+            vCtx.fill();
+
+            vCtx.restore();
+            requestAnimationFrame(drawVinyl);
+        }
+        drawVinyl();
+
+        function updateTrackUI() {
+            const t = tracks[currentTrackIdx];
+            document.getElementById('track-title').textContent = t.title;
+            document.getElementById('track-artist').textContent = t.artist;
+            document.getElementById('music-progress-bar').style.backgroundColor = t.color;
+        }
+
+        document.getElementById('music-toggle').addEventListener('click', () => {
+            isMusicPlaying = !isMusicPlaying;
+            playTactileClick(isMusicPlaying ? 700 : 450);
+            document.getElementById('music-pause-icon').classList.toggle('hidden', !isMusicPlaying);
+            document.getElementById('music-play-icon').classList.toggle('hidden', isMusicPlaying);
+            if (isMusicPlaying) {
+                startSynthLoop();
+            } else {
+                stopSynthLoop();
+            }
+        });
+
+        document.getElementById('music-next').addEventListener('click', () => {
+            currentTrackIdx = (currentTrackIdx + 1) % tracks.length;
+            musicProgress = 12;
+            document.getElementById('music-progress-bar').style.width = '12%';
+            updateTrackUI();
+            playTactileClick(740);
+        });
+
+        document.getElementById('music-prev').addEventListener('click', () => {
+            currentTrackIdx = (currentTrackIdx - 1 + tracks.length) % tracks.length;
+            musicProgress = 12;
+            document.getElementById('music-progress-bar').style.width = '12%';
+            updateTrackUI();
+            playTactileClick(620);
+        });
+
+        document.getElementById('music-progress-Wrap').addEventListener('click', (e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            musicProgress = Math.max(5, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+            document.getElementById('music-progress-bar').style.width = `${musicProgress}%`;
+            playTactileClick(660);
+        });
+
+        const volumeSlider = document.getElementById('volume-slider');
+        const volumeFill = document.getElementById('volume-fill');
+        let isDraggingVolume = false;
+
+        function updateVolumeFromEvent(e) {
+            const rect = volumeSlider.getBoundingClientRect();
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            let pct = ((clientY - rect.top) / rect.height) * 100;
+            pct = Math.max(18, Math.min(92, pct));
+            volumeFill.style.height = `${pct}%`;
+            masterVolume = pct / 100;
+        }
+
+        volumeSlider.addEventListener('mousedown', (e) => {
+            isDraggingVolume = true;
+            updateVolumeFromEvent(e);
+            playTactileClick(500, 0.02);
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (isDraggingVolume) updateVolumeFromEvent(e);
+        });
+        window.addEventListener('mouseup', () => {
+            isDraggingVolume = false;
+        });
+
+        const bellBtn = document.getElementById('bell-btn');
+        const bellSvg = document.getElementById('bell-svg');
+        bellBtn.addEventListener('click', () => {
+            bellSvg.classList.remove('animate-bell');
+            void bellSvg.offsetWidth;
+            bellSvg.classList.add('animate-bell');
+            playBellChime();
+        });
+
+        let isRecording = false;
+        let isWavePlaying = false;
+        const recordBtn = document.getElementById('record-btn');
+        const recordDot = document.getElementById('record-dot');
+
+        recordBtn.addEventListener('click', () => {
+            isRecording = !isRecording;
+            recordDot.classList.toggle('recording-active', isRecording);
+            isWavePlaying = isRecording;
+            playTactileClick(isRecording ? 820 : 420, 0.05);
+        });
+
+        let batteryLevel = 25;
+        const batteryPercentEl = document.getElementById('battery-percent');
+        const batteryStatusEl = document.getElementById('battery-status');
+        const batteryCells = document.querySelectorAll('.battery-cell');
+
+        function updateBatteryUI(lvl) {
+            batteryLevel = lvl;
+            batteryPercentEl.textContent = `${lvl}%`;
+            batteryStatusEl.textContent = lvl === 100 ? 'FULLY CHARGED' : 'CHARGING...';
+            const activeBars = Math.ceil(lvl / 20);
+            batteryCells.forEach((cell, idx) => {
+                if (idx < activeBars) {
+                    cell.style.backgroundColor = '#32f078';
+                    cell.style.boxShadow = '0 0 12px rgba(50,240,120,0.35)';
+                } else {
+                    cell.style.backgroundColor = '#2c2c2e';
+                    cell.style.boxShadow = 'none';
+                }
+            });
+        }
+
+        batteryCells.forEach((cell) => {
+            cell.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const lvl = parseInt(cell.dataset.level, 10);
+                updateBatteryUI(lvl);
+                playTactileClick(400 + lvl * 3);
+            });
+        });
+
+        document.getElementById('battery-widget').addEventListener('click', () => {
+            const next = batteryLevel >= 100 ? 25 : Math.min(100, batteryLevel + 25);
+            updateBatteryUI(next);
+            playTactileClick(550);
+        });
+
+        let switchOn = false;
+        const powerSwitch = document.getElementById('power-switch');
+        const switchThumb = document.getElementById('switch-thumb');
+        const labelOff = document.getElementById('switch-label-off');
+        const labelOn = document.getElementById('switch-label-on');
+
+        powerSwitch.addEventListener('click', () => {
+            switchOn = !switchOn;
+            playTactileClick(switchOn ? 720 : 440, 0.04, 'triangle');
+            if (switchOn) {
+                switchThumb.style.transform = 'translateX(84px)';
+                labelOff.style.color = '#7c7c82';
+                labelOn.style.color = '#050505';
+            } else {
+                switchThumb.style.transform = 'translateX(0px)';
+                labelOff.style.color = '#050505';
+                labelOn.style.color = '#7c7c82';
+            }
+        });
+
+        const waveCanvas = document.getElementById('wave-canvas');
+        const waveCtx = waveCanvas.getContext('2d');
+        const wavePlayhead = document.getElementById('wave-playhead');
+        const baseHeights = [18, 34, 24, 52, 26, 38, 16, 46, 22, 50, 20, 32];
+        let wavePos = 14;
+        let wavePhase = 0;
+
+        document.getElementById('wave-toggle-btn').addEventListener('click', () => {
+            isWavePlaying = !isWavePlaying;
+            playTactileClick(isWavePlaying ? 680 : 460);
+            document.getElementById('wave-pause-icon').classList.toggle('hidden', !isWavePlaying);
+            document.getElementById('wave-play-icon').classList.toggle('hidden', isWavePlaying);
+        });
+
+        document.getElementById('wave-scrub-area').addEventListener('click', (e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            wavePos = Math.max(6, Math.min(92, ((e.clientX - rect.left) / rect.width) * 100));
+            wavePlayhead.style.left = `${wavePos}%`;
+            playTactileClick(610);
+        });
+
+        function drawWaveform() {
+            waveCtx.clearRect(0, 0, waveCanvas.width, waveCanvas.height);
+            if (isWavePlaying) {
+                wavePhase += 0.15;
+                wavePos += 0.35;
+                if (wavePos > 92) wavePos = 8;
+                wavePlayhead.style.left = `${wavePos}%`;
+            }
+
+            const spacing = waveCanvas.width / (baseHeights.length + 1);
+            baseHeights.forEach((h, i) => {
+                const x = (i + 1) * spacing;
+                const dynamicH = isWavePlaying
+                    ? Math.max(12, h + Math.sin(wavePhase + i * 0.9) * 16)
+                    : h;
+                const y = (waveCanvas.height - dynamicH) / 2;
+                waveCtx.beginPath();
+                waveCtx.moveTo(x, y);
+                waveCtx.lineTo(x, y + dynamicH);
+                const barPct = (x / waveCanvas.width) * 100;
+                waveCtx.strokeStyle = barPct <= wavePos ? '#8e8e93' : '#c7c7cc';
+                waveCtx.lineWidth = 3.2;
+                waveCtx.lineCap = 'round';
+                waveCtx.stroke();
+            });
+
+            requestAnimationFrame(drawWaveform);
+        }
+        drawWaveform();
+
+        const compassCanvas = document.getElementById('compass-canvas');
+        const cCtx = compassCanvas.getContext('2d');
+        let compassTargetAngle = 0;
+        let compassCurrentAngle = 0;
+
+        document.getElementById('compass-widget').addEventListener('mousemove', (e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const dx = e.clientX - (rect.left + rect.width / 2);
+            const dy = e.clientY - (rect.top + rect.height / 2);
+            compassTargetAngle = Math.atan2(dy, dx) + Math.PI / 2;
+        });
+
+        document.getElementById('compass-widget').addEventListener('mouseleave', () => {
+            compassTargetAngle = 0;
+        });
+
+        function drawCompass() {
+            const w = compassCanvas.width;
+            const h = compassCanvas.height;
+            const cx = w / 2;
+            const cy = h / 2;
+            const r = w / 2;
+
+            cCtx.clearRect(0, 0, w, h);
+
+            compassCurrentAngle += (compassTargetAngle - compassCurrentAngle) * 0.1;
+
+            cCtx.save();
+            cCtx.translate(cx, cy);
+            cCtx.rotate(compassCurrentAngle * 0.35);
+
+            for (let i = 0; i < 12; i++) {
+                if (i % 3 === 0) continue;
+                const ang = (i * 30 - 90) * (Math.PI / 180);
+                cCtx.save();
+                cCtx.rotate(ang);
+                cCtx.beginPath();
+                cCtx.moveTo(r - 24, 0);
+                cCtx.lineTo(r - 14, 0);
+                cCtx.strokeStyle = '#55555a';
+                cCtx.lineWidth = 3;
+                cCtx.lineCap = 'round';
+                cCtx.stroke();
+                cCtx.restore();
+            }
+
+            cCtx.font = '600 19px Inter, sans-serif';
+            cCtx.textAlign = 'center';
+            cCtx.textBaseline = 'middle';
+
+            cCtx.fillStyle = '#f03e36';
+            cCtx.fillText('N', 0, -r + 24);
+            cCtx.fillStyle = '#68686e';
+            cCtx.fillText('S', 0, r - 24);
+            cCtx.fillText('E', r - 24, 1);
+            cCtx.fillText('W', -r + 26, 1);
+
+            cCtx.restore();
+
+            cCtx.save();
+            cCtx.translate(cx, cy);
+            cCtx.rotate(compassCurrentAngle);
+            cCtx.beginPath();
+            cCtx.moveTo(0, -82);
+            cCtx.lineTo(-19, -46);
+            cCtx.lineTo(19, -46);
+            cCtx.closePath();
+            cCtx.fillStyle = '#ffffff';
+            cCtx.lineJoin = 'round';
+            cCtx.fill();
+            cCtx.restore();
+
+            cCtx.beginPath();
+            cCtx.arc(cx, cy, 25, 0, Math.PI * 2);
+            cCtx.fillStyle = '#1c1c1f';
+            cCtx.fill();
+
+            cCtx.strokeStyle = '#525257';
+            cCtx.lineWidth = 2.5;
+            cCtx.lineCap = 'round';
+            cCtx.beginPath();
+            cCtx.moveTo(cx - 10, cy);
+            cCtx.lineTo(cx + 10, cy);
+            cCtx.moveTo(cx, cy - 10);
+            cCtx.lineTo(cx, cy + 10);
+            cCtx.stroke();
+
+            requestAnimationFrame(drawCompass);
+        }
+        drawCompass();
+
+        const todoState = [true, false, false];
+        const todoLabels = document.querySelectorAll('#todo-list label');
+        const todoProgress = document.getElementById('todo-progress');
+
+        function renderTodos() {
+            let completed = 0;
+            todoLabels.forEach((lbl, idx) => {
+                const checked = todoState[idx];
+                if (checked) completed++;
+                const box = lbl.querySelector('.todo-box');
+                const check = lbl.querySelector('.todo-check');
+                const text = lbl.querySelector('.todo-text');
+
+                if (checked) {
+                    box.className = 'todo-box w-[16px] h-[16px] rounded-[5px] bg-[#f872e2] flex items-center justify-center transition-all duration-200';
+                    check.classList.remove('opacity-0');
+                    check.classList.add('opacity-100');
+                    text.className = 'todo-text text-[11.5px] text-[#7c7c82] transition-colors duration-200';
+                } else {
+                    box.className = 'todo-box w-[16px] h-[16px] rounded-[5px] bg-[#1e1e21] border border-[#2e2e32] flex items-center justify-center transition-all duration-200';
+                    check.classList.remove('opacity-100');
+                    check.classList.add('opacity-0');
+                    text.className = 'todo-text text-[11.5px] text-[#e5e5ea] transition-colors duration-200';
+                }
+            });
+            const pct = completed === 1 ? 30 : (completed / todoState.length) * 100;
+            todoProgress.style.width = `${pct}%`;
+        }
+
+        todoLabels.forEach((lbl, idx) => {
+            lbl.addEventListener('click', (e) => {
+                e.preventDefault();
+                todoState[idx] = !todoState[idx];
+                playTactileClick(todoState[idx] ? 740 : 460);
+                renderTodos();
+            });
+        });
+
+        const waterCanvas = document.getElementById('water-canvas');
+        const waterCtx = waterCanvas.getContext('2d');
+        const waterAmountEl = document.getElementById('water-amount');
+        let waterMl = 250;
+        let waterFillRatio = 0.44;
+        let targetFillRatio = 0.44;
+        let waveTime = 0;
+        let waveAmpBoost = 0;
+
+        document.getElementById('water-widget').addEventListener('click', () => {
+            waterMl = waterMl >= 1000 ? 250 : waterMl + 250;
+            waterAmountEl.textContent = `${waterMl}ml`;
+            targetFillRatio = 0.34 + (waterMl / 1250) * 0.45;
+            if (waterMl === 250) targetFillRatio = 0.44;
+            waveAmpBoost = 14;
+            playTactileClick(480 + waterMl * 0.3, 0.05);
+        });
+
+        document.getElementById('water-widget').addEventListener('mousemove', () => {
+            waveAmpBoost = Math.min(10, waveAmpBoost + 1.2);
+        });
+
+        function drawWaterWaves() {
+            const w = waterCanvas.width;
+            const h = waterCanvas.height;
+            waterCtx.clearRect(0, 0, w, h);
+
+            waterFillRatio += (targetFillRatio - waterFillRatio) * 0.06;
+            waveAmpBoost *= 0.96;
+            waveTime += 0.035;
+
+            const baseY = h * (1 - waterFillRatio);
+            const amp = 14 + waveAmpBoost;
+
+            waterCtx.beginPath();
+            waterCtx.moveTo(0, h);
+            for (let x = 0; x <= w; x += 8) {
+                const y = baseY + Math.sin((x / w) * Math.PI * 2 - 1.8 + waveTime * 0.8) * amp - 6;
+                waterCtx.lineTo(x, y);
+            }
+            waterCtx.lineTo(w, h);
+            waterCtx.closePath();
+            waterCtx.fillStyle = '#164b7d';
+            waterCtx.fill();
+
+            waterCtx.beginPath();
+            waterCtx.moveTo(0, h);
+            for (let x = 0; x <= w; x += 8) {
+                const y = baseY - Math.sin((x / w) * Math.PI * 1.65 + 0.35 + waveTime) * (amp + 4) + 6;
+                waterCtx.lineTo(x, y);
+            }
+            waterCtx.lineTo(w, h);
+            waterCtx.closePath();
+            waterCtx.fillStyle = '#2b99ff';
+            waterCtx.fill();
+
+            requestAnimationFrame(drawWaterWaves);
+        }
+        drawWaterWaves();
+
+        const accounts = [
+            { balance: '$94,100', label: 'BALANCE', order: ['bg-[#2b99ff]', 'bg-[#f5b418]', 'bg-[#d93831]'] },
+            { balance: '$42,850', label: 'SAVINGS', order: ['bg-[#f5b418]', 'bg-[#d93831]', 'bg-[#2b99ff]'] },
+            { balance: '$128,400', label: 'VAULT', order: ['bg-[#d93831]', 'bg-[#2b99ff]', 'bg-[#f5b418]'] }
+        ];
+        let accountIdx = 0;
+
+        document.getElementById('wallet-widget').addEventListener('click', () => {
+            accountIdx = (accountIdx + 1) % accounts.length;
+            const acc = accounts[accountIdx];
+            document.getElementById('wallet-balance').textContent = acc.balance;
+            document.getElementById('wallet-label').textContent = acc.label;
+            playTactileClick(690, 0.04);
+        });
+
+        const calDays = [
+            { weekday: 'Tuesday', num: '22', count: '6', e1: ['Deep Focus Session', '9:00 AM – 11:00 AM'], e2: ['Client Sync: Feedback', '12:30 PM – 1:15 PM'] },
+            { weekday: 'Wednesday', num: '23', count: '4', e1: ['3D Shader Review', '10:00 AM – 11:30 AM'], e2: ['Design System Sync', '2:00 PM – 3:00 PM'] },
+            { weekday: 'Thursday', num: '24', count: '5', e1: ['Product Architecture', '9:30 AM – 11:00 AM'], e2: ['Prototype Demo', '4:00 PM – 5:00 PM'] }
+        ];
+        let calDayIdx = 0;
+
+        document.getElementById('calendar-date-box').addEventListener('click', () => {
+            calDayIdx = (calDayIdx + 1) % calDays.length;
+            const d = calDays[calDayIdx];
+            document.getElementById('cal-weekday').textContent = d.weekday;
+            document.getElementById('cal-daynum').textContent = d.num;
+            document.getElementById('cal-event-count').textContent = d.count;
+            document.getElementById('event-1-title').textContent = d.e1[0];
+            document.getElementById('event-1-time').textContent = d.e1[1];
+            document.getElementById('event-2-title').textContent = d.e2[0];
+            document.getElementById('event-2-time').textContent = d.e2[1];
+            playTactileClick(620);
+        });
+
+        const calRedLine = document.getElementById('calendar-red-line');
+        document.querySelectorAll('.cal-event-card').forEach((card) => {
+            card.addEventListener('click', () => {
+                const slot = card.dataset.slot;
+                calRedLine.style.top = slot === '0' ? '7px' : '75px';
+                playTactileClick(710);
+            });
+        });
+
+        const btnTilt = document.getElementById('toggle-3d-tilt');
+        const btnOrbit = document.getElementById('toggle-3d-orbit');
+        const btnReset = document.getElementById('reset-design-btn');
+
+        btnTilt.addEventListener('click', () => {
+            tiltEnabled = !tiltEnabled;
+            btnTilt.classList.toggle('active', tiltEnabled);
+            playTactileClick(580);
+        });
+
+        btnOrbit.addEventListener('click', () => {
+            isometricMode = !isometricMode;
+            btnOrbit.classList.toggle('active', isometricMode);
+            board.style.transform = isometricMode
+                ? 'rotateX(16deg) rotateY(-14deg) rotateZ(2deg) scale(0.95)'
+                : '';
+            playTactileClick(640);
+        });
+
+        btnReset.addEventListener('click', () => {
+            isometricMode = false;
+            btnOrbit.classList.remove('active');
+            board.style.transform = '';
+            if (isSleepMode) toggleSleepMode();
+            clockLiveMode = false;
+            brightnessFill.style.height = '77%';
+            document.documentElement.style.setProperty('--scene-brightness', '1');
+            signalLevel = 3;
+            signalBars.forEach((b, i) => b.style.backgroundColor = i < 3 ? '#ffffff' : '#464649');
+            useCelsius = false;
+            currentTempF = 79;
+            weatherType = 'partly';
+            document.getElementById('weather-desc').textContent = 'Partly Cloudy with Light Rain';
+            renderWeatherTemp();
+            currentTrackIdx = 0;
+            musicProgress = 28;
+            document.getElementById('music-progress-bar').style.width = '28%';
+            updateTrackUI();
+            volumeFill.style.height = '52%';
+            updateBatteryUI(25);
+            if (switchOn) powerSwitch.click();
+            wavePos = 14;
+            wavePlayhead.style.left = '14%';
+            todoState[0] = true; todoState[1] = false; todoState[2] = false;
+            renderTodos();
+            waterMl = 250;
+            waterAmountEl.textContent = '250ml';
+            targetFillRatio = 0.44;
+            accountIdx = 0;
+            document.getElementById('wallet-balance').textContent = '$94,100';
+            document.getElementById('wallet-label').textContent = 'BALANCE';
+            calDayIdx = 2;
+            document.getElementById('calendar-date-box').click();
+            calRedLine.style.top = '7px';
+            playTactileClick(800);
+        });
+
+        window.onload = () => {
+            initWebGLBackground();
+        };
+    </script>
+</body>
+
+</html>
