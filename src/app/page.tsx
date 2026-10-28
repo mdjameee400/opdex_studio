@@ -655,22 +655,13 @@ export default function OpdexLandingPage() {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-space-xs pt-space-xs" onClick={(e) => e.stopPropagation()}>
+                      <div className="pt-space-xs" onClick={(e) => e.stopPropagation()}>
                         <button
-                          className={`flex-1 py-2 px-space-sm ${art.btnColor} text-brutal-black border-2 border-brutal-black rounded-xl font-label-md text-xs font-bold shadow-brutal hover:-translate-x-0.5 hover:-translate-y-0.5 active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#18181B] transition-all text-center flex items-center justify-center gap-1.5`}
+                          className={`w-full py-2.5 px-space-sm ${art.btnColor} text-brutal-black border-2 border-brutal-black rounded-xl font-label-md text-xs md:text-sm font-bold shadow-brutal hover:-translate-x-0.5 hover:-translate-y-0.5 active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#18181B] transition-all text-center flex items-center justify-center gap-2`}
                           onClick={() => handleInspect(art)}
                         >
                           <span>Inspect 3D</span>
-                          <span className="text-xs">🕹️</span>
-                        </button>
-                        <button
-                          className="py-2 px-space-sm bg-cream-card text-brutal-black border-2 border-brutal-black rounded-xl font-label-md text-xs font-bold shadow-brutal hover:bg-amber-100 transition-colors flex items-center gap-1"
-                          onClick={() => handleCopy(art.id, art.name)}
-                        >
-                          <span className="material-symbols-outlined text-sm">
-                            {copiedId === art.id ? "check" : "content_copy"}
-                          </span>
-                          <span>{copiedId === art.id ? "Copied!" : "Code"}</span>
+                          <span className="text-xs md:text-sm">🕹️</span>
                         </button>
                       </div>
                     </div>
