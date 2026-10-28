@@ -97,3 +97,29 @@ export function playKeyTap(note = 440) {
     // Ignore audio errors
   }
 }
+
+export function playSuccessChime() {
+  if (isMuted) return;
+  const ctx = getContext();
+  if (!ctx) return;
+  try {
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const startTime = ctx.currentTime + idx * 0.07;
+      const duration = 0.22;
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, startTime);
+      gain.gain.setValueAtTime(0.09, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    });
+  } catch {
+    // Ignore audio errors
+  }
+}
+

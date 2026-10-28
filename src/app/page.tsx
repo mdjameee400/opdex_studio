@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import { playClick, playPop, playKeyTap, playToggle } from "@/utils/audio";
+import { playClick, playPop, playKeyTap, playToggle, playSuccessChime } from "@/utils/audio";
 
 interface ElementModalData {
   title: string;
@@ -21,7 +21,21 @@ export default function OpdexLandingPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [pixBouncing, setPixBouncing] = useState(false);
   const [email, setEmail] = useState("");
+  const [projectUid, setProjectUid] = useState("");
   const [subscribedMsg, setSubscribedMsg] = useState(false);
+  const [currentYear, setCurrentYear] = useState(2026);
+  const [ticketCopied, setTicketCopied] = useState(false);
+  const [submissionModal, setSubmissionModal] = useState<{
+    email: string;
+    projectUid: string;
+    ticketId: string;
+    projectName?: string;
+    timestamp: string;
+  } | null>(null);
+
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
   
   // Interactive Live Element Modal
   const [activeModal, setActiveModal] = useState<ElementModalData | null>(null);
@@ -170,10 +184,25 @@ export default function OpdexLandingPage() {
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
-    playPop(650);
+    if (!email.trim() || !projectUid.trim()) return;
+    playSuccessChime();
+
+    const cleanUid = projectUid.replace(/^#/, "").trim().toLowerCase();
+    const matched = artifacts.find(
+      (a) => a.id.toLowerCase() === cleanUid || a.name.toLowerCase().includes(cleanUid)
+    );
+
+    const ticketId = `OPDEX-${currentYear}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+    setSubmissionModal({
+      email: email.trim(),
+      projectUid: projectUid.trim(),
+      ticketId,
+      projectName: matched ? matched.name : projectUid.trim(),
+      timestamp: new Date().toLocaleTimeString(),
+    });
+
     setSubscribedMsg(true);
-    setEmail("");
   };
 
   const filteredArtifacts = artifacts.filter((art) => {
@@ -643,38 +672,75 @@ export default function OpdexLandingPage() {
               </div>
 
               <div className="relative z-10 flex flex-col items-center text-center max-w-2xl mx-auto gap-space-md">
-                {/* Live Stunt Tag */}
-                <div className="inline-flex items-center gap-space-xs bg-cream-card text-brutal-black border-2 border-brutal-black px-space-md py-1 rounded-full shadow-brutal">
-                  <span className="text-sm">🎁</span>
-                  <span className="font-label-md text-xs font-bold uppercase tracking-wider">Free Weekly Shaders</span>
-                </div>
-
                 {/* Punchy Headline */}
                 <h2 className="font-display-hero text-3xl md:text-5xl font-extrabold leading-tight text-brutal-black tracking-tight">
                   Secret 3D Drop Every Friday.
                 </h2>
 
                 {/* Short Note */}
-                <p className="font-body-md text-sm md:text-base text-zinc-800 max-w-lg font-medium">
-                  No spam. Pure dimensional WebGL files and code snippets delivered straight to your terminal.
+                <p className="font-body-md text-sm md:text-base text-zinc-800 max-w-xl font-medium">
+                  Drop your email and project UID or name for the code package. As an admin, our dispatch bot instantly locates your project file and routes the full source bundle to your inbox.
                 </p>
 
-                {/* High-Contrast Input Group */}
-                <form className="w-full max-w-md flex flex-col sm:flex-row items-stretch gap-space-xs pt-space-xs" onSubmit={handleSubscribe}>
-                  <input
-                    className="flex-1 bg-cream-card text-brutal-black font-body-md text-sm md:text-base px-space-md py-3 rounded-2xl border-2 border-brutal-black shadow-brutal focus:outline-none focus:shadow-brutal-lg placeholder:text-zinc-500 font-medium"
-                    placeholder="drop_your@email.com"
-                    required
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
+                {/* High-Contrast Dual Input Form */}
+                <form className="w-full max-w-xl flex flex-col gap-3 pt-space-xs" onSubmit={handleSubscribe}>
+                  <div className="flex flex-col sm:flex-row items-stretch gap-2.5">
+                    <input
+                      className="flex-1 bg-cream-card text-brutal-black font-body-md text-sm md:text-base px-space-md py-3 rounded-2xl border-2 border-brutal-black shadow-brutal focus:outline-none focus:shadow-brutal-lg placeholder:text-zinc-500 font-medium"
+                      placeholder="drop_your@email.com"
+                      required
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                    <input
+                      className="flex-1 bg-cream-card text-brutal-black font-body-md text-sm md:text-base px-space-md py-3 rounded-2xl border-2 border-brutal-black shadow-brutal focus:outline-none focus:shadow-brutal-lg placeholder:text-zinc-500 font-medium"
+                      placeholder="Project UID / Name (e.g. #ox-ui)"
+                      required
+                      type="text"
+                      value={projectUid}
+                      onChange={(e) => setProjectUid(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Quick Clickable Chips for project UIDs */}
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 pt-0.5">
+                    <span className="text-xs font-bold text-zinc-700 mr-1 flex items-center gap-1">
+                      <span className="text-sm">⚡</span>
+                      <span>Quick Select:</span>
+                    </span>
+                    {[
+                      { uid: "#ox-ui", label: "Nothing OS", color: "bg-pastel-mint" },
+                      { uid: "#glass-widgets", label: "3D Glass Bento", color: "bg-pastel-coral" },
+                      { uid: "#keycap-studio", label: "Keycap Lab", color: "bg-pastel-yellow" },
+                      { uid: "#retro-desktop", label: "GameBoy 3D", color: "bg-pastel-purple" },
+                      { uid: "#glyph-synth", label: "Glyph Synth", color: "bg-pastel-peach" },
+                    ].map((item) => (
+                      <button
+                        key={item.uid}
+                        type="button"
+                        onClick={() => {
+                          setProjectUid(item.uid);
+                          playKeyTap(540);
+                        }}
+                        className={`text-xs font-bold px-2.5 py-1 rounded-full border border-brutal-black shadow-brutal-sm hover:-translate-y-0.5 active:translate-y-0.5 transition-transform flex items-center gap-1 ${
+                          projectUid === item.uid
+                            ? "bg-brutal-black text-white"
+                            : `${item.color} text-brutal-black`
+                        }`}
+                      >
+                        <span>{item.uid}</span>
+                        <span className="opacity-75 text-[10px]">({item.label})</span>
+                      </button>
+                    ))}
+                  </div>
+
                   <button
-                    className="bg-pastel-coral text-brutal-black font-label-lg font-bold px-space-lg py-3 rounded-2xl border-2 border-brutal-black shadow-brutal hover:-translate-x-0.5 hover:-translate-y-0.5 active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#18181B] transition-transform whitespace-nowrap flex items-center justify-center gap-1.5"
+                    className="self-center bg-pastel-coral text-brutal-black font-label-lg font-bold px-space-xl py-3.5 rounded-2xl border-2 border-brutal-black shadow-brutal hover:-translate-x-0.5 hover:-translate-y-0.5 active:translate-x-0.5 active:translate-y-0.5 active:shadow-[1px_1px_0px_#18181B] transition-transform whitespace-nowrap flex items-center justify-center gap-2 mt-1"
                     type="submit"
                   >
                     <span>Get The Code</span>
-                    <span>🚀</span>
+                    <span className="text-base">🚀</span>
                   </button>
                 </form>
 
@@ -682,7 +748,7 @@ export default function OpdexLandingPage() {
                 <div className="flex items-center gap-space-xs bg-cream-card px-3 py-1 rounded-full border-2 border-brutal-black shadow-brutal-sm">
                   <span className="w-2.5 h-2.5 rounded-full bg-pastel-mint border border-brutal-black"></span>
                   <span className="font-label-sm text-xs font-bold text-zinc-700">
-                    {subscribedMsg ? "Key delivered to terminal! Check your email." : "8,420 spatial builders already subscribed"}
+                    {subscribedMsg ? "✓ Request recorded! Dispatch modal opened." : "8,420 spatial builders already subscribed"}
                   </span>
                 </div>
               </div>
@@ -696,7 +762,7 @@ export default function OpdexLandingPage() {
       <footer className="w-full bg-[#FAF5EB] py-space-lg border-t-2 border-brutal-black">
         <div className="w-full px-margin-mobile md:px-margin flex flex-col sm:flex-row items-center justify-between gap-space-md">
           <p className="font-body-sm text-xs md:text-sm text-zinc-700 font-semibold text-center sm:text-left">
-            © 2025 Opdex Studio. Built with pastel neo-brutal physics.
+            © {currentYear} Opdex Studio. Built with pastel neo-brutal physics.
           </p>
           <div className="flex items-center gap-space-xs bg-cream-card px-3 py-1 rounded-full border-2 border-brutal-black shadow-brutal-sm">
             <span className="w-2 h-2 rounded-full bg-pastel-mint border border-brutal-black"></span>
@@ -862,6 +928,136 @@ export default function OpdexLandingPage() {
                 Got It!
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* UNIQUE SUBMISSION CONFIRMATION MODAL */}
+      {submissionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-cream-card border-[3px] border-brutal-black rounded-3xl shadow-brutal-xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            
+            {/* Window Top Bar */}
+            <div className="px-5 py-3.5 bg-pastel-yellow border-b-2 border-brutal-black flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 rounded-full bg-pastel-coral border-2 border-brutal-black"></span>
+                <span className="w-3.5 h-3.5 rounded-full bg-pastel-yellow border-2 border-brutal-black"></span>
+                <span className="w-3.5 h-3.5 rounded-full bg-pastel-mint border-2 border-brutal-black"></span>
+                <span className="font-label-sm text-xs font-extrabold uppercase tracking-wider text-brutal-black ml-2">
+                  Admin Dispatch Terminal · Dispatched
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSubmissionModal(null);
+                  playPop(500);
+                }}
+                className="w-7 h-7 rounded-xl bg-white border-2 border-brutal-black flex items-center justify-center text-sm font-bold shadow-brutal-sm hover:scale-105 active:scale-95 transition-transform"
+                title="Close confirmation"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content Area */}
+            <div className="p-6 sm:p-7 flex flex-col items-center text-center gap-4">
+              {/* Celebration Icon */}
+              <div className="w-16 h-16 rounded-2xl bg-pastel-mint border-2 border-brutal-black shadow-brutal flex items-center justify-center text-3xl rotate-3">
+                📦
+              </div>
+
+              <div>
+                <div className="inline-flex items-center gap-1.5 bg-pastel-purple/20 text-purple-900 border border-purple-800/30 px-3 py-1 rounded-full text-xs font-bold mb-2">
+                  <span className="w-2 h-2 rounded-full bg-pastel-purple border border-brutal-black animate-ping"></span>
+                  <span>Admin Match Engine Active</span>
+                </div>
+                <h3 className="font-display-hero text-2xl sm:text-3xl font-extrabold text-brutal-black">
+                  Code Package Dispatched!
+                </h3>
+                <p className="font-body-md text-sm text-zinc-700 mt-1 max-w-sm">
+                  We located your requested project in the database. The standalone WebGL & HTML bundle is queued for delivery.
+                </p>
+              </div>
+
+              {/* Telemetry Ticket Box */}
+              <div className="w-full bg-[#FAF5EB] rounded-2xl border-2 border-brutal-black p-4 text-left flex flex-col gap-2.5 shadow-brutal-sm">
+                <div className="flex items-center justify-between pb-2 border-b border-zinc-300">
+                  <span className="font-label-sm text-xs font-bold text-zinc-500 uppercase tracking-wider">Ticket UID</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-extrabold bg-pastel-yellow px-2 py-0.5 rounded border border-brutal-black">
+                      {submissionModal.ticketId}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(submissionModal.ticketId);
+                        playPop(600);
+                        setTicketCopied(true);
+                        setTimeout(() => setTicketCopied(false), 2000);
+                      }}
+                      className="text-[11px] font-bold text-blue-600 hover:underline"
+                    >
+                      {ticketCopied ? "✓ Copied" : "Copy"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="font-label-sm text-xs font-bold text-zinc-500 uppercase tracking-wider">Requested UID / Name</span>
+                  <span className="font-display text-xs font-bold bg-pastel-coral/30 text-brutal-black px-2 py-0.5 rounded border border-brutal-black">
+                    {submissionModal.projectUid}
+                  </span>
+                </div>
+
+                {submissionModal.projectName && submissionModal.projectName !== submissionModal.projectUid && (
+                  <div className="flex items-center justify-between">
+                    <span className="font-label-sm text-xs font-bold text-zinc-500 uppercase tracking-wider">Matched Element</span>
+                    <span className="font-display text-xs font-bold text-zinc-800">
+                      {submissionModal.projectName}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <span className="font-label-sm text-xs font-bold text-zinc-500 uppercase tracking-wider">Recipient Email</span>
+                  <span className="font-mono text-xs font-bold text-zinc-800 truncate max-w-[200px]">
+                    {submissionModal.email}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="font-label-sm text-xs font-bold text-zinc-500 uppercase tracking-wider">Package Manifest</span>
+                  <span className="font-label-sm text-[11px] font-bold text-emerald-700 bg-pastel-mint/40 px-2 py-0.5 rounded border border-emerald-800/30">
+                    HTML5 + WebGL + Audio (.zip)
+                  </span>
+                </div>
+              </div>
+
+              {/* Admin & Security Note */}
+              <div className="text-xs text-zinc-600 bg-cream-card p-3 rounded-xl border border-zinc-300 w-full text-left flex items-start gap-2">
+                <span className="text-base select-none">💡</span>
+                <p className="leading-tight">
+                  <strong>Admin Note:</strong> Your UID <code>{submissionModal.projectUid}</code> has been indexed. If you need immediate raw file access, you can also inspect it live right now in the sandbox above.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="w-full flex flex-col sm:flex-row gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSubmissionModal(null);
+                    playPop(500);
+                  }}
+                  className="flex-1 bg-pastel-yellow text-brutal-black font-label-md font-bold py-3 px-4 rounded-xl border-2 border-brutal-black shadow-brutal hover:-translate-y-0.5 active:translate-y-0.5 transition-transform flex items-center justify-center gap-1.5"
+                >
+                  <span>Got it, Back to Sandbox!</span>
+                  <span>⚡</span>
+                </button>
+              </div>
+
+            </div>
+
           </div>
         </div>
       )}
