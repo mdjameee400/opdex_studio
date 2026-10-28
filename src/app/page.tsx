@@ -187,18 +187,25 @@ export default function OpdexLandingPage() {
     if (!email.trim() || !projectUid.trim()) return;
     playSuccessChime();
 
-    const cleanUid = projectUid.replace(/^#/, "").trim().toLowerCase();
+    const rawInput = projectUid.trim();
+    const cleanNum = rawInput.replace(/[^0-9]/g, "");
+    const normalizedBadge = cleanNum ? `#${cleanNum.padStart(2, "0")}` : rawInput;
+
     const matched = artifacts.find(
-      (a) => a.id.toLowerCase() === cleanUid || a.name.toLowerCase().includes(cleanUid)
+      (a) =>
+        a.badge.toLowerCase() === rawInput.toLowerCase() ||
+        a.badge.toLowerCase() === normalizedBadge.toLowerCase() ||
+        a.id.toLowerCase() === rawInput.toLowerCase().replace(/^#/, "") ||
+        a.name.toLowerCase().includes(rawInput.toLowerCase())
     );
 
     const ticketId = `OPDEX-${currentYear}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
 
     setSubmissionModal({
       email: email.trim(),
-      projectUid: projectUid.trim(),
+      projectUid: matched ? matched.badge : (normalizedBadge.startsWith("#") ? normalizedBadge : `#${normalizedBadge}`),
       ticketId,
-      projectName: matched ? matched.name : projectUid.trim(),
+      projectName: matched ? `${matched.badge} · ${matched.name}` : projectUid.trim(),
       timestamp: new Date().toLocaleTimeString(),
     });
 
@@ -628,9 +635,20 @@ export default function OpdexLandingPage() {
                           <h3 className="font-headline-sm text-lg font-bold text-brutal-black">
                             {art.name}
                           </h3>
-                          <span className="font-label-sm text-xs text-brutal-black font-mono font-bold bg-pastel-yellow px-2 py-0.5 rounded border border-brutal-black">
-                            {art.badge}
-                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setProjectUid(art.badge);
+                              playKeyTap(580);
+                              document.getElementById("request-code-section")?.scrollIntoView({ behavior: "smooth" });
+                            }}
+                            title={`Click to pre-fill UID ${art.badge} for code request`}
+                            className="font-label-sm text-xs text-brutal-black font-mono font-bold bg-pastel-yellow px-2 py-0.5 rounded border border-brutal-black hover:scale-105 active:scale-95 cursor-pointer shadow-brutal-sm transition-transform flex items-center gap-1"
+                          >
+                            <span>UID:</span>
+                            <span>{art.badge}</span>
+                          </button>
                         </div>
                         <p className="font-body-sm text-xs md:text-sm text-zinc-600 font-medium line-clamp-2">
                           {art.desc}
@@ -664,7 +682,7 @@ export default function OpdexLandingPage() {
           </section>
 
           {/* MARKETING STUNT & INSTANT EMAIL DROP */}
-          <section className="w-full px-margin-mobile md:px-margin py-space-2xl bg-[#FAF5EB]">
+          <section className="w-full px-margin-mobile md:px-margin py-space-2xl bg-[#FAF5EB]" id="request-code-section">
             <div className="max-w-5xl mx-auto relative bg-pastel-yellow text-brutal-black rounded-3xl p-space-lg md:p-space-2xl border-2 border-brutal-black shadow-brutal-xl overflow-hidden">
               {/* Floating Neo-Brutalist Badge */}
               <div className="absolute top-4 right-6 w-12 h-12 rounded-2xl bg-pastel-coral border-2 border-brutal-black text-brutal-black flex items-center justify-center font-display-hero text-2xl shadow-brutal rotate-12 select-none">
@@ -679,7 +697,7 @@ export default function OpdexLandingPage() {
 
                 {/* Short Note */}
                 <p className="font-body-md text-sm md:text-base text-zinc-800 max-w-xl font-medium">
-                  Drop your email and project UID or name for the code package. As an admin, our dispatch bot instantly locates your project file and routes the full source bundle to your inbox.
+                  Drop your email and the card UID (like <strong>#01</strong>, <strong>#02</strong>) to get the code. As an admin, our dispatch bot matches the card number directly to the project source file.
                 </p>
 
                 {/* High-Contrast Dual Input Form */}
@@ -695,7 +713,7 @@ export default function OpdexLandingPage() {
                     />
                     <input
                       className="flex-1 bg-cream-card text-brutal-black font-body-md text-sm md:text-base px-space-md py-3 rounded-2xl border-2 border-brutal-black shadow-brutal focus:outline-none focus:shadow-brutal-lg placeholder:text-zinc-500 font-medium"
-                      placeholder="Project UID / Name (e.g. #ox-ui)"
+                      placeholder="Card UID (e.g. #01, #02, #03)"
                       required
                       type="text"
                       value={projectUid}
@@ -703,18 +721,18 @@ export default function OpdexLandingPage() {
                     />
                   </div>
 
-                  {/* Quick Clickable Chips for project UIDs */}
+                  {/* Quick Clickable Chips for Card Numbers (#01, #02, etc.) */}
                   <div className="flex flex-wrap items-center justify-center gap-1.5 pt-0.5">
                     <span className="text-xs font-bold text-zinc-700 mr-1 flex items-center gap-1">
-                      <span className="text-sm">⚡</span>
-                      <span>Quick Select:</span>
+                      <span className="text-sm">🏷️</span>
+                      <span>Card UID:</span>
                     </span>
                     {[
-                      { uid: "#ox-ui", label: "Nothing OS", color: "bg-pastel-mint" },
-                      { uid: "#glass-widgets", label: "3D Glass Bento", color: "bg-pastel-coral" },
-                      { uid: "#keycap-studio", label: "Keycap Lab", color: "bg-pastel-yellow" },
-                      { uid: "#retro-desktop", label: "GameBoy 3D", color: "bg-pastel-purple" },
-                      { uid: "#glyph-synth", label: "Glyph Synth", color: "bg-pastel-peach" },
+                      { uid: "#01", label: "Nothing OS", color: "bg-pastel-mint" },
+                      { uid: "#02", label: "3D Glass", color: "bg-pastel-coral" },
+                      { uid: "#03", label: "Keycap Lab", color: "bg-pastel-yellow" },
+                      { uid: "#04", label: "GameBoy 3D", color: "bg-pastel-purple" },
+                      { uid: "#05", label: "Glyph Synth", color: "bg-pastel-peach" },
                     ].map((item) => (
                       <button
                         key={item.uid}
@@ -729,7 +747,7 @@ export default function OpdexLandingPage() {
                             : `${item.color} text-brutal-black`
                         }`}
                       >
-                        <span>{item.uid}</span>
+                        <span className="font-mono">{item.uid}</span>
                         <span className="opacity-75 text-[10px]">({item.label})</span>
                       </button>
                     ))}
@@ -1003,8 +1021,8 @@ export default function OpdexLandingPage() {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="font-label-sm text-xs font-bold text-zinc-500 uppercase tracking-wider">Requested UID / Name</span>
-                  <span className="font-display text-xs font-bold bg-pastel-coral/30 text-brutal-black px-2 py-0.5 rounded border border-brutal-black">
+                  <span className="font-label-sm text-xs font-bold text-zinc-500 uppercase tracking-wider">Requested Card UID</span>
+                  <span className="font-mono text-xs font-extrabold bg-pastel-coral text-brutal-black px-2 py-0.5 rounded border border-brutal-black">
                     {submissionModal.projectUid}
                   </span>
                 </div>
