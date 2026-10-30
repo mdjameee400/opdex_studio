@@ -135,37 +135,6 @@ export default function OpdexLandingPage() {
       iconChar: "🐱",
       stats: "7 Tooth Keys · Claw FX",
     },
-    {
-      id: "glyph-synth",
-      name: "Dot-Matrix Glyph Synthesizer",
-      badge: "#07",
-      category: "shaders",
-      categoryLabel: "Shaders / Audio",
-      tagColor: "bg-pastel-peach",
-      headerBg: "bg-[#FFF0E6]",
-      btnColor: "bg-pastel-peach",
-      desc: "3x3 morphing glyph constellation launcher with synthesized audio tick harmonics and responsive theme pods.",
-      elementFile: "/elements/ox_ui.html",
-      image: "/elements/thumbnails/ox_ui.png",
-      iconChar: "✦",
-      stats: "Web Audio · Matrix Canvas",
-    },
-    {
-      id: "add-new-element",
-      name: "+ Add Your 8th Element",
-      badge: "NEW",
-      category: "studio",
-      categoryLabel: "Drop-in Slot",
-      tagColor: "bg-pastel-blue",
-      headerBg: "bg-[#EBF5FB]",
-      btnColor: "bg-pastel-blue",
-      desc: "Drop any single-file HTML or WebGL project into /elements to instantly add it to your live stack.",
-      elementFile: "/elements/hello_cat.html",
-      image: "/elements/thumbnails/hello_cat.png",
-      iconChar: "◎",
-      isAddCard: true,
-      stats: "10s Setup · Auto-Reload",
-    },
   ];
 
   const handleGravityChange = (val: number) => {
@@ -196,11 +165,6 @@ export default function OpdexLandingPage() {
   };
 
   const handleInspect = (art: typeof artifacts[0]) => {
-    if (art.isAddCard) {
-      setIsAddGuideOpen(true);
-      playPop(550);
-      return;
-    }
     playClick(600);
     setActiveModal({
       title: art.name,
@@ -243,7 +207,9 @@ export default function OpdexLandingPage() {
   };
 
   const filteredArtifacts = artifacts.filter((art) => {
-    const matchesFilter = activeFilter === "all" || art.category === activeFilter;
+    const matchesFilter = activeFilter === "all" || 
+                          art.category === activeFilter ||
+                          (activeFilter === "shaders" && (art.id === "interactive-spidy" || art.id === "hello-cat" || art.id === "ox-ui"));
     const matchesSearch = art.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           art.desc.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
@@ -760,7 +726,6 @@ export default function OpdexLandingPage() {
                       { uid: "#04", label: "GameBoy 3D", color: "bg-pastel-purple" },
                       { uid: "#05", label: "Spider-Luffy", color: "bg-pastel-coral" },
                       { uid: "#06", label: "Grin Cat", color: "bg-pastel-yellow" },
-                      { uid: "#07", label: "Glyph Synth", color: "bg-pastel-peach" },
                     ].map((item) => (
                       <button
                         key={item.uid}
