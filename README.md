@@ -39,7 +39,8 @@ Every card represents a live, interactive 3D / WebGL laboratory:
 - **UID `#03` · Keycap Studio Mechanical Lab**: Tactile mechanical keyboard switch designer with audio feedback and custom legends.
 - **UID `#04` · Super GameBoy 3D Retro Desktop**: 90s console virtual workspace with OrbitControls, procedural hand cursor, and CRT scanlines.
 - **UID `#05` · Interactive 3D Spider-Luffy Live Portrait**: Three.js WebGL aura particles, interactive Haki lightning canvas, 24 tactile web cells & Spider-Sense eye tracking.
-- **UID `#06` · Dot-Matrix Glyph Synthesizer**: Procedural constellation audio-reactive matrix canvas.
+- **UID `#06` · Interactive Grin Cat Live Canvas**: Playful tactile creature with 7 interactive tooth synth keys, Three.js particles, claw slashes & jaw bite physics.
+- **UID `#07` · Dot-Matrix Glyph Synthesizer**: Procedural constellation audio-reactive matrix canvas.
 
 ---
 

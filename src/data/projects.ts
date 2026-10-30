@@ -114,4 +114,23 @@ export const PROJECTS: ProjectItem[] = [
       tech: "Three.js / Canvas 2D / Audio",
     },
   },
+  {
+    id: "hello-cat",
+    title: "Interactive Grin Cat Live Canvas",
+    shortTitle: "Grin Cat 2D/3D",
+    tagline: "Jaw bite physics, 7 tactile tooth keys, claw slashes & sonic rings",
+    category: "Interactive Creature Lab",
+    description: "A playful tactile creature canvas with Three.js ambient particles, interactive 2D claw slashes, responsive 7-tooth synth keyboard, and laughing jaw chatter physics.",
+    path: "/elements/hello_cat.html",
+    tags: ["Three.js", "Canvas FX", "Creature", "Synthesizer", "Bite Physics"],
+    themeColor: "#FFE66D",
+    badgeColor: "#FF9F43",
+    icon: "smile",
+    featured: true,
+    stats: {
+      widgets: 7,
+      fps: "60 FPS",
+      tech: "Three.js / Canvas 2D / Audio",
+    },
+  },
 ];

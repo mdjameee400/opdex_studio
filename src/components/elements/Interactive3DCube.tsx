@@ -66,6 +66,9 @@ export default function Interactive3DCube() {
             <span className="px-2.5 py-1 bg-[#FFEAE5] border-2 border-black rounded-xl text-xs font-bold font-mono">
               📁 elements/interactive_spidy.html
             </span>
+            <span className="px-2.5 py-1 bg-[#FFFBE6] border-2 border-black rounded-xl text-xs font-bold font-mono">
+              📁 elements/hello_cat.html
+            </span>
           </div>
         </div>
 
@@ -137,13 +140,13 @@ export default function Interactive3DCube() {
               SPIDY
             </div>
 
-            {/* Bottom Face: White */}
+            {/* Bottom Face: Yellow Grin Cat */}
             <div
               onClick={() => handleFaceClick("bottom", 360)}
-              className="absolute inset-0 bg-white border-[3px] border-black flex items-center justify-center text-black font-bold text-xs rounded-xl"
+              className="absolute inset-0 bg-[#FFE66D] border-[3px] border-black flex items-center justify-center text-black font-extrabold text-xs rounded-xl shadow-inner"
               style={{ transform: "rotateX(-90deg) translateZ(60px)" }}
             >
-              LAB
+              CAT
             </div>
           </div>
 

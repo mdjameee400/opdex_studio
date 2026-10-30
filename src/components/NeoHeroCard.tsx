@@ -500,7 +500,7 @@ export default function NeoHeroCard({ onOpenProject }: NeoHeroCardProps) {
               onClick={() => handleTabChange("tab2")}
               className="neo-pressable px-3 py-1 bg-[#38BDF8] text-black border-2 border-black rounded-full text-xs font-bold shadow-brutal-sm cursor-pointer flex items-center gap-1"
             >
-              ★ 5 HTML Labs
+              ★ 6 HTML Labs
             </span>
           </div>
 
@@ -569,11 +569,11 @@ export default function NeoHeroCard({ onOpenProject }: NeoHeroCardProps) {
                   <span className="text-xs font-bold font-mono ml-1">Live HTML Labs Showcase</span>
                 </div>
                 <span className="text-[11px] font-semibold bg-[#FFE66D] border border-black px-2 py-0.5 rounded-full">
-                  5 Interactive Projects
+                  6 Interactive Projects
                 </span>
               </div>
 
-              {/* 5 Project Selector Buttons inside the card */}
+              {/* 6 Project Selector Buttons inside the card */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
                 {PROJECTS.map((proj) => (
                   <button

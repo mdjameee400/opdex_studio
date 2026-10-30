@@ -23,7 +23,7 @@ interface ProjectShowcaseProps {
 export default function ProjectShowcase({ onOpenProject, onAddNewProject }: ProjectShowcaseProps) {
   const [activeCategory, setActiveCategory] = useState<string>("All");
 
-  const categories = ["All", "3D WebGL", "Interactive 3D Portrait", "Interface System", "Hardware Design Lab", "Retro 3D Game Station"];
+  const categories = ["All", "3D WebGL", "Interactive 3D Portrait", "Interactive Creature Lab", "Interface System", "Hardware Design Lab", "Retro 3D Game Station"];
 
   const filteredProjects = activeCategory === "All"
     ? PROJECTS
@@ -46,7 +46,7 @@ export default function ProjectShowcase({ onOpenProject, onAddNewProject }: Proj
             Integrated Project Labs
           </h2>
           <p className="text-sm md:text-base text-black/70 max-w-xl mt-1">
-            5 standalone, high-performance web applications embedded directly into your workspace. Launch them live, test them in responsive device frames, or open in full resolution.
+            6 standalone, high-performance web applications embedded directly into your workspace. Launch them live, test them in responsive device frames, or open in full resolution.
           </p>
         </div>
 
@@ -202,7 +202,7 @@ export default function ProjectShowcase({ onOpenProject, onAddNewProject }: Proj
             <Plus size={32} strokeWidth={3} className="text-black" />
           </div>
           <h3 className="text-xl font-extrabold text-[#121212] font-display mb-1">
-            + Add Project #6 & Beyond
+            + Add Project #7 & Beyond
           </h3>
           <p className="text-xs sm:text-sm text-black/70 max-w-sm mb-5">
             Want to add your next single-file HTML or WebGL experiment? Simply drop it in the folder and register it in 1 config line!
