@@ -38,7 +38,8 @@ Every card represents a live, interactive 3D / WebGL laboratory:
 - **UID `#02` · 3D Glass Bento UI Dashboard**: Three.js WebGL spatial dashboard with specular glass reflections and real-time telemetry.
 - **UID `#03` · Keycap Studio Mechanical Lab**: Tactile mechanical keyboard switch designer with audio feedback and custom legends.
 - **UID `#04` · Super GameBoy 3D Retro Desktop**: 90s console virtual workspace with OrbitControls, procedural hand cursor, and CRT scanlines.
-- **UID `#05` · Dot-Matrix Glyph Synthesizer**: Procedural constellation audio-reactive matrix canvas.
+- **UID `#05` · Interactive 3D Spider-Luffy Live Portrait**: Three.js WebGL aura particles, interactive Haki lightning canvas, 24 tactile web cells & Spider-Sense eye tracking.
+- **UID `#06` · Dot-Matrix Glyph Synthesizer**: Procedural constellation audio-reactive matrix canvas.
 
 ---
 

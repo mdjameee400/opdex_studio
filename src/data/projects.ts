@@ -95,4 +95,23 @@ export const PROJECTS: ProjectItem[] = [
       tech: "Three.js / GSAP / Canvas",
     },
   },
+  {
+    id: "interactive-spidy",
+    title: "Interactive 3D Spider-Luffy Live Portrait",
+    shortTitle: "Spider-Luffy 3D",
+    tagline: "Haki lightning, Three.js aura particles, tactile web cells & Spider-Sense",
+    category: "Interactive 3D Portrait",
+    description: "A dynamic hybrid 3D anime portrait powered by Three.js WebGL particles, interactive Haki lightning canvas, 24 tactile spider-suit cells, and reactive eye tracking.",
+    path: "/elements/interactive_spidy.html",
+    tags: ["Three.js", "WebGL", "Canvas FX", "Spider-Sense", "Haki"],
+    themeColor: "#FF5E5B",
+    badgeColor: "#FFE66D",
+    icon: "zap",
+    featured: true,
+    stats: {
+      widgets: 24,
+      fps: "60 FPS",
+      tech: "Three.js / Canvas 2D / Audio",
+    },
+  },
 ];

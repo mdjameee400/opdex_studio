@@ -63,6 +63,9 @@ export default function Interactive3DCube() {
             <span className="px-2.5 py-1 bg-white border-2 border-black rounded-xl text-xs font-bold font-mono">
               📁 elements/retro_desktop.html
             </span>
+            <span className="px-2.5 py-1 bg-[#FFEAE5] border-2 border-black rounded-xl text-xs font-bold font-mono">
+              📁 elements/interactive_spidy.html
+            </span>
           </div>
         </div>
 
@@ -125,13 +128,13 @@ export default function Interactive3DCube() {
               <span>KEYCAP</span>
             </div>
 
-            {/* Top Face: Mint */}
+            {/* Top Face: Coral / Spidy */}
             <div
               onClick={() => handleFaceClick("top", 740)}
-              className="absolute inset-0 bg-[#4ECCA3] border-[3px] border-black flex items-center justify-center text-black font-extrabold text-xs rounded-xl"
+              className="absolute inset-0 bg-[#FF5E5B] border-[3px] border-black flex items-center justify-center text-white font-extrabold text-xs rounded-xl shadow-inner"
               style={{ transform: "rotateX(90deg) translateZ(60px)" }}
             >
-              3D
+              SPIDY
             </div>
 
             {/* Bottom Face: White */}

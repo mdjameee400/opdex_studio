@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive 3D Spider-Luffy Live Portrait</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #121318;
+      --silhouette-color: #050507;
+      --suit-color: #c43d4c;
+      --eye-color: #ff6b35;
+      --aura-color: #ffd166;
+      --rim-opacity: 1;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      transition: background-color 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+      cursor: crosshair;
+    }
+
+    /* Optional Dot-Matrix Halftone Backdrop Mode */
+    body.mode-halftone::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(rgba(0, 0, 0, 0.22) 1.5px, transparent 1.5px);
+      background-size: 14px 14px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Three.js WebGL Ambient Particle & Aura Canvas */
+    #webgl-aura {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Interactive 2D FX Canvas (Haki Lightning, Spider-Sense Ripples & Web Strands) */
+    #fx-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    /* Compact Framed Portrait Card Stage */
+    .portrait-stage {
+      position: relative;
+      z-index: 10;
+      width: min(410px, 84vw, 78vh);
+      height: min(410px, 84vw, 78vh);
+      border-radius: 34px;
+      background-color: var(--bg-color);
+      border: 1.5px solid rgba(255, 255, 255, 0.12);
+      box-shadow:
+        0 28px 64px -12px rgba(0, 0, 0, 0.68),
+        0 0 42px -8px rgba(255, 209, 102, 0.16),
+        inset 0 1px 2px rgba(255, 255, 255, 0.15);
+      overflow: hidden;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      perspective: 1200px;
+      transition: background-color 0.45s ease, transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.35s ease;
+    }
+
+    .character-rig {
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      transform-origin: center bottom;
+      transition: transform 0.12s cubic-bezier(0.2, 0.8, 0.2, 1);
+      will-change: transform;
+      position: relative;
+    }
+
+    #character-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      overflow: visible;
+      filter: drop-shadow(0 18px 38px rgba(0, 0, 0, 0.28));
+      transition: filter 0.3s ease;
+    }
+
+    body.mode-overdrive #character-svg {
+      filter:
+        drop-shadow(0 0 22px var(--aura-color))
+        drop-shadow(0 18px 38px rgba(0, 0, 0, 0.45));
+    }
+
+    /* Base Black Silhouette */
+    #base-silhouette {
+      fill: var(--silhouette-color);
+      transition: fill 0.35s ease;
+    }
+
+    /* 24 Interactive Spider-Suit Web Cells */
+    .suit-cell {
+      fill: var(--suit-color);
+      transition: fill 0.28s ease, filter 0.2s ease, transform 0.2s ease;
+      cursor: pointer;
+    }
+
+    .suit-cell:hover {
+      filter: brightness(1.28) drop-shadow(0 0 8px var(--suit-color));
+    }
+
+    .suit-cell.pulse-cell {
+      filter: brightness(1.55) drop-shadow(0 0 14px var(--eye-color));
+    }
+
+    /* Interactive Eyes & Scar Group */
+    #eyes-scar-rig {
+      transition: transform 0.07s cubic-bezier(0.2, 0.8, 0.2, 1);
+      will-change: transform;
+    }
+
+    .eye-shape {
+      fill: var(--eye-color);
+      transition: fill 0.3s ease, filter 0.25s ease, transform 0.14s cubic-bezier(0.22, 1, 0.36, 1);
+      transform-box: fill-box;
+      transform-origin: center bottom;
+      cursor: pointer;
+    }
+
+    #scar-shape {
+      fill: var(--eye-color);
+      transition: fill 0.3s ease, filter 0.25s ease, transform 0.14s ease;
+      transform-box: fill-box;
+      transform-origin: center center;
+    }
+
+    body.mode-overdrive .eye-shape,
+    .character-rig.haki-active .eye-shape {
+      filter: drop-shadow(0 0 16px var(--eye-color)) drop-shadow(0 0 30px var(--aura-color));
+    }
+
+    body.mode-overdrive #scar-shape,
+    .character-rig.haki-active #scar-shape {
+      filter: drop-shadow(0 0 10px var(--eye-color));
+    }
+
+    /* Eye Blinking & Squinting States */
+    .eye-blink {
+      transform: scaleY(0.05) !important;
+    }
+
+    .eye-squint {
+      transform: scaleY(0.58) scaleX(1.04) !important;
+    }
+
+    .eye-wide {
+      transform: scaleY(1.16) scaleX(1.05) !important;
+    }
+
+    /* =====================================================================
+       UNIQUE MORPHING 3x3 DOT-MATRIX GLYPH HAMBURGER LAUNCHER
+       ===================================================================== */
+    .glyph-launcher {
+      position: fixed;
+      top: 22px;
+      right: 22px;
+      z-index: 100;
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      background: #0c0c0e;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.28);
+      display: grid;
+      grid-template-columns: repeat(3, 6px);
+      grid-template-rows: repeat(3, 6px);
+      gap: 5px;
+      align-content: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), border-radius 0.3s ease;
+    }
+
+    .glyph-launcher:hover {
+      transform: scale(1.08);
+    }
+
+    .glyph-launcher.open {
+      border-radius: 50%;
+      transform: rotate(90deg) scale(1.05);
+    }
+
+    .glyph-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: var(--eye-color);
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease, background-color 0.25s ease;
+    }
+
+    .glyph-dot:nth-child(5) {
+      background-color: var(--suit-color);
+      box-shadow: 0 0 8px var(--suit-color);
+    }
+
+    .glyph-launcher:hover .glyph-dot:nth-child(2),
+    .glyph-launcher:hover .glyph-dot:nth-child(4),
+    .glyph-launcher:hover .glyph-dot:nth-child(6),
+    .glyph-launcher:hover .glyph-dot:nth-child(8) {
+      opacity: 0.35;
+      transform: scale(0.75);
+    }
+
+    .glyph-launcher.open .glyph-dot:nth-child(2),
+    .glyph-launcher.open .glyph-dot:nth-child(4),
+    .glyph-launcher.open .glyph-dot:nth-child(6),
+    .glyph-launcher.open .glyph-dot:nth-child(8) {
+      opacity: 0;
+      transform: scale(0);
+    }
+
+    .glyph-launcher.open .glyph-dot:nth-child(1) { transform: translate(3px, 3px); }
+    .glyph-launcher.open .glyph-dot:nth-child(3) { transform: translate(-3px, 3px); }
+    .glyph-launcher.open .glyph-dot:nth-child(7) { transform: translate(3px, -3px); }
+    .glyph-launcher.open .glyph-dot:nth-child(9) { transform: translate(-3px, -3px); }
+
+    /* =====================================================================
+       CUSTOMIZER POD (Strictly 5 Colors per Category + 4 Interactive Modes)
+       ===================================================================== */
+    .customizer-pod {
+      position: fixed;
+      top: 80px;
+      right: 22px;
+      z-index: 99;
+      width: 244px;
+      background: rgba(12, 12, 15, 0.92);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 24px;
+      padding: 18px;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.42);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-12px) scale(0.95);
+      transform-origin: top right;
+      transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .customizer-pod.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0) scale(1);
+    }
+
+    .swatch-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+
+    .color-swatch {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s ease;
+    }
+
+    .color-swatch:hover {
+      transform: scale(1.12);
+    }
+
+    .color-swatch.selected {
+      border-color: #ffffff;
+      transform: scale(1.14);
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.22);
+    }
+
+    .mode-chip {
+      height: 34px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: #a1a1aa;
+    }
+
+    .mode-chip:hover {
+      background: rgba(255, 255, 255, 0.16);
+      color: #ffffff;
+    }
+
+    .mode-chip.selected {
+      background: #ffffff;
+      color: #0c0c0e;
+      border-color: #ffffff;
+    }
+  </style>
+</head>
+<body class="mode-overdrive">
+
+  <!-- 1. Three.js WebGL Ambient 3D Particles & Aura Canvas -->
+  <canvas id="webgl-aura"></canvas>
+
+  <!-- 2. High-FPS 2D Interactive FX Canvas (Haki Lightning, Web Strands & Spider-Sense) -->
+  <canvas id="fx-canvas"></canvas>
+
+  <!-- 3. Unique 3x3 Dot-Matrix Glyph Hamburger Launcher -->
+  <button type="button" class="glyph-launcher" id="glyph-hamburger" aria-label="Customize Character & UI">
+    <span class="glyph-dot"></span>
+    <span class="glyph-dot"></span>
+    <span class="glyph-dot"></span>
+    <span class="glyph-dot"></span>
+    <span class="glyph-dot"></span>
+    <span class="glyph-dot"></span>
+    <span class="glyph-dot"></span>
+    <span class="glyph-dot"></span>
+    <span class="glyph-dot"></span>
+  </button>
+
+  <!-- 4. Customizer Pod (Strictly 5 Curated Colors per Category + 4 Interactive Modes) -->
+  <div class="customizer-pod" id="customizer-pod">
+    <!-- BG Colors (5 Limit) -->
+    <div class="mb-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[10px] tracking-[0.14em] uppercase text-[#8a8a90] font-medium">BG</span>
+        <span class="w-1.5 h-1.5 rounded-full bg-[#c43d4c]"></span>
+      </div>
+      <div class="swatch-row" id="bg-swatches">
+        <button type="button" class="color-swatch" data-bg="#767d83" style="background: #767d83;" title="Original Slate Grey"></button>
+        <button type="button" class="color-swatch selected" data-bg="#121318" style="background: #121318;" title="Obsidian Dark"></button>
+        <button type="button" class="color-swatch" data-bg="#280d12" style="background: #280d12;" title="Crimson Night"></button>
+        <button type="button" class="color-swatch" data-bg="#0f172a" style="background: #0f172a;" title="Cyber Blueprint"></button>
+        <button type="button" class="color-swatch" data-bg="#d6d3cd" style="background: #d6d3cd;" title="Warm Alabaster"></button>
+      </div>
+    </div>
+
+    <!-- Suit Web Cell Colors (5 Limit) -->
+    <div class="mb-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[10px] tracking-[0.14em] uppercase text-[#8a8a90] font-medium">SUIT</span>
+        <span class="w-1.5 h-1.5 rounded-full bg-white/40"></span>
+      </div>
+      <div class="swatch-row" id="suit-swatches">
+        <button type="button" class="color-swatch selected" data-suit="#c43d4c" style="background: #c43d4c;" title="Classic Spider Red"></button>
+        <button type="button" class="color-swatch" data-suit="#7c3aed" style="background: #7c3aed;" title="Symbiote Violet"></button>
+        <button type="button" class="color-swatch" data-suit="#0284c7" style="background: #0284c7;" title="Cyber Spider Cyan"></button>
+        <button type="button" class="color-swatch" data-suit="#10b981" style="background: #10b981;" title="Venom Emerald"></button>
+        <button type="button" class="color-swatch" data-suit="#eab308" style="background: #eab308;" title="Imperium Gold"></button>
+      </div>
+    </div>
+
+    <!-- Eyes & Scar Glow Colors (5 Limit) -->
+    <div class="mb-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[10px] tracking-[0.14em] uppercase text-[#8a8a90] font-medium">EYES</span>
+        <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+      </div>
+      <div class="swatch-row" id="eye-swatches">
+        <button type="button" class="color-swatch" data-eye="#ffffff" data-aura="#ff2e43" style="background: linear-gradient(135deg, #ffffff 55%, #ff2e43 55%);" title="Pure White & Haki Red"></button>
+        <button type="button" class="color-swatch" data-eye="#ff2e43" data-aura="#ff0022" style="background: linear-gradient(135deg, #ff2e43 55%, #111111 55%);" title="Conqueror Crimson"></button>
+        <button type="button" class="color-swatch selected" data-eye="#ff6b35" data-aura="#ffd166" style="background: linear-gradient(135deg, #ff6b35 55%, #ffd166 55%);" title="Solar Orange"></button>
+        <button type="button" class="color-swatch" data-eye="#38bdf8" data-aura="#0284c7" style="background: linear-gradient(135deg, #38bdf8 55%, #0284c7 55%);" title="Electric Cyan"></button>
+        <button type="button" class="color-swatch" data-eye="#fde047" data-aura="#eab308" style="background: linear-gradient(135deg, #fde047 55%, #a855f7 55%);" title="Gear-5 Sun Gold"></button>
+      </div>
+    </div>
+
+    <!-- Interactive FX Modes (4 Modes) -->
+    <div>
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[10px] tracking-[0.14em] uppercase text-[#8a8a90] font-medium">MODE</span>
+      </div>
+      <div class="grid grid-cols-4 gap-2" id="mode-buttons">
+        <!-- 1. Haki Lightning + Gaze -->
+        <button type="button" class="mode-chip" data-mode="haki" title="Live Eye Tracking + Click for Haki Lightning">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+        </button>
+        <!-- 2. Interactive Web-Shooter -->
+        <button type="button" class="mode-chip" data-mode="web" title="Web-Shooter Mode (Click to shoot webs)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="9"/>
+            <line x1="12" y1="3" x2="12" y2="21"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+          </svg>
+        </button>
+        <!-- 3. Overdrive Aura -->
+        <button type="button" class="mode-chip selected" data-mode="overdrive" title="Conqueror's Haki Overdrive Aura">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+        <!-- 4. Dot-Matrix Halftone -->
+        <button type="button" class="mode-chip" data-mode="halftone" title="Dot-Matrix Halftone Shader">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="6" cy="6" r="2"/><circle cx="12" cy="6" r="2"/><circle cx="18" cy="6" r="2"/>
+            <circle cx="6" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="18" cy="12" r="2"/>
+            <circle cx="6" cy="18" r="2"/><circle cx="12" cy="18" r="2"/><circle cx="18" cy="18" r="2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Main Interactive Character Rig (Exact 1024x1024 Vector Reconstruction) -->
+  <div class="portrait-stage" id="portrait-stage">
+    <div class="character-rig" id="character-rig">
+      <svg id="character-svg" viewBox="0 0 1024 1024" preserveAspectRatio="xMidYMax meet">
+        <!-- Layer 1: Full Character Shadow Silhouette (Spiky Hair, Head, Neck & Shoulders) -->
+        <path id="base-silhouette" d="M 323 0 L 314 28 L 312 51 L 273 60 L 228 86 L 194 118 L 171 154 L 150 196 L 206 145 L 240 126 L 247 125 L 248 130 L 234 146 L 212 185 L 182 275 L 164 310 L 135 344 L 91 372 L 103 374 L 137 369 L 177 356 L 195 345 L 201 346 L 193 417 L 183 447 L 162 487 L 173 485 L 174 480 L 217 453 L 218 447 L 230 439 L 232 491 L 246 535 L 252 537 L 271 563 L 296 583 L 294 641 L 302 638 L 316 620 L 322 623 L 328 643 L 328 674 L 314 815 L 307 831 L 296 843 L 291 843 L 289 850 L 259 872 L 248 874 L 247 879 L 103 958 L 0 994 L 0 1023 L 987 1023 L 890 1014 L 841 992 L 839 986 L 834 989 L 760 964 L 624 879 L 632 804 L 656 797 L 670 787 L 754 701 L 758 701 L 762 691 L 771 686 L 770 681 L 790 654 L 809 613 L 841 506 L 847 506 L 864 535 L 901 572 L 892 553 L 885 516 L 886 444 L 892 443 L 899 450 L 966 480 L 1005 491 L 966 453 L 935 392 L 924 341 L 923 322 L 928 321 L 977 373 L 1004 427 L 996 394 L 975 341 L 925 264 L 982 264 L 1023 255 L 1023 228 L 988 217 L 952 196 L 894 147 L 893 139 L 888 142 L 873 124 L 838 95 L 839 90 L 887 84 L 935 69 L 965 53 L 971 54 L 982 42 L 951 46 L 880 42 L 772 0 L 380 0 L 368 13 L 363 12 L 364 0 Z" />
+
+        <!-- Layer 2: 24 Individual Interactive Spider-Man Suit Web Panels -->
+        <g id="suit-web-group">
+            <path class="suit-cell" data-cell="0" d="M 706 1021 L 701 1016 L 696 1016 L 695 1017 L 694 1017 L 693 1018 L 692 1018 L 691 1019 L 687 1019 L 686 1020 L 685 1020 L 684 1021 L 683 1021 L 682 1022 L 681 1022 L 681 1023 L 706 1023 Z" />
+            <path class="suit-cell" data-cell="1" d="M 133 1017 L 133 1019 L 140 1019 L 141 1020 L 147 1020 L 148 1021 L 152 1021 L 153 1022 L 156 1022 L 157 1023 L 236 1023 L 237 1022 L 237 1019 L 236 1019 L 235 1018 L 230 1018 L 229 1017 L 225 1017 L 224 1016 L 219 1016 L 218 1015 L 211 1015 L 210 1014 L 204 1014 L 203 1013 L 195 1013 L 194 1012 L 156 1012 L 155 1013 L 150 1013 L 149 1014 L 144 1014 L 143 1015 L 139 1015 L 138 1016 L 135 1016 L 134 1017 Z" />
+            <path class="suit-cell" data-cell="2" d="M 709 1009 L 709 1013 L 711 1013 L 712 1014 L 712 1016 L 717 1016 L 718 1017 L 717 1018 L 717 1021 L 719 1023 L 755 1023 L 755 1022 L 754 1021 L 753 1021 L 752 1020 L 751 1020 L 750 1019 L 749 1019 L 748 1018 L 746 1018 L 745 1017 L 744 1017 L 743 1016 L 742 1016 L 741 1015 L 738 1015 L 737 1014 L 737 1013 L 736 1013 L 734 1011 L 732 1011 L 731 1010 L 730 1010 L 729 1009 L 728 1009 L 727 1008 L 726 1008 L 725 1007 L 724 1007 L 723 1006 L 721 1006 L 720 1005 L 717 1005 L 717 1006 L 716 1007 L 713 1007 L 712 1008 L 711 1008 L 710 1009 Z" />
+            <path class="suit-cell" data-cell="3" d="M 78 1000 L 74 1000 L 73 1001 L 72 1001 L 69 1004 L 68 1004 L 65 1007 L 64 1007 L 61 1010 L 61 1011 L 60 1012 L 59 1012 L 59 1013 L 58 1014 L 55 1014 L 54 1015 L 54 1016 L 51 1019 L 49 1019 L 48 1020 L 48 1021 L 47 1022 L 46 1022 L 46 1023 L 83 1023 L 83 1016 L 82 1015 L 82 1011 L 81 1010 L 81 1007 L 80 1006 L 80 1004 L 78 1002 Z" />
+            <path class="suit-cell" data-cell="4" d="M 258 1014 L 258 1016 L 262 1016 L 263 1017 L 268 1017 L 269 1018 L 275 1018 L 276 1019 L 283 1019 L 284 1020 L 287 1020 L 288 1019 L 291 1019 L 292 1020 L 292 1021 L 295 1021 L 296 1020 L 299 1022 L 303 1022 L 304 1023 L 383 1023 L 383 1022 L 380 1019 L 379 1019 L 377 1017 L 376 1017 L 373 1014 L 372 1014 L 367 1010 L 365 1010 L 365 1011 L 364 1012 L 363 1011 L 363 1008 L 362 1007 L 360 1007 L 358 1004 L 355 1004 L 354 1003 L 354 1002 L 352 1002 L 350 1000 L 347 1000 L 342 997 L 340 997 L 339 996 L 338 996 L 337 995 L 337 994 L 336 994 L 335 993 L 333 993 L 332 992 L 327 992 L 326 991 L 326 990 L 324 990 L 323 989 L 320 989 L 319 988 L 316 988 L 315 987 L 313 987 L 312 988 L 311 987 L 311 986 L 304 986 L 303 985 L 292 985 L 291 984 L 286 984 L 285 985 L 283 985 L 282 986 L 281 986 L 281 987 L 279 989 L 279 990 L 278 991 L 277 991 L 277 992 L 276 993 L 275 993 L 275 994 L 274 995 L 273 995 L 269 999 L 269 1000 L 263 1006 L 263 1007 L 261 1009 L 260 1009 L 260 1010 L 259 1011 L 259 1013 Z" />
+            <path class="suit-cell" data-cell="5" d="M 70 990 L 68 990 L 67 989 L 67 986 L 66 985 L 65 985 L 63 983 L 59 983 L 58 984 L 56 984 L 55 985 L 54 985 L 53 986 L 51 986 L 50 987 L 48 987 L 47 988 L 45 988 L 44 989 L 42 989 L 41 990 L 39 990 L 38 991 L 36 991 L 35 992 L 33 992 L 32 993 L 30 993 L 30 994 L 29 995 L 24 995 L 24 996 L 23 997 L 22 997 L 21 998 L 16 998 L 16 999 L 15 1000 L 10 1000 L 9 1001 L 7 1001 L 6 1002 L 4 1002 L 3 1003 L 2 1003 L 1 1004 L 0 1004 L 0 1023 L 32 1023 L 34 1021 L 34 1020 L 35 1019 L 37 1019 L 38 1018 L 38 1017 L 40 1015 L 42 1015 L 44 1013 L 45 1013 L 46 1012 L 46 1011 L 48 1009 L 50 1009 L 51 1008 L 52 1008 L 55 1005 L 56 1005 L 56 1004 L 58 1002 L 60 1002 L 63 999 L 64 999 L 67 996 L 68 996 L 70 994 Z" />
+            <path class="suit-cell" data-cell="6" d="M 544 997 L 544 1007 L 545 1007 L 546 1008 L 545 1009 L 545 1011 L 546 1012 L 546 1015 L 547 1016 L 547 1019 L 548 1019 L 549 1020 L 548 1021 L 548 1023 L 627 1023 L 627 1022 L 625 1019 L 625 1017 L 623 1014 L 623 1012 L 622 1011 L 622 1009 L 621 1008 L 621 1006 L 619 1003 L 619 1000 L 617 997 L 617 995 L 616 994 L 616 992 L 614 990 L 614 985 L 613 984 L 613 980 L 611 978 L 611 977 L 610 977 L 609 976 L 607 976 L 606 975 L 604 975 L 603 974 L 600 974 L 599 973 L 582 973 L 581 974 L 578 974 L 577 975 L 575 975 L 574 976 L 572 976 L 569 978 L 567 978 L 566 979 L 565 979 L 564 980 L 563 980 L 562 981 L 561 981 L 559 983 L 559 984 L 558 985 L 556 985 L 555 986 L 554 986 L 553 987 L 553 989 L 552 990 L 550 990 L 545 995 L 545 996 Z" />
+            <path class="suit-cell" data-cell="7" d="M 97 972 L 93 972 L 92 973 L 90 973 L 89 974 L 87 974 L 86 975 L 84 975 L 83 976 L 81 976 L 80 977 L 78 977 L 77 978 L 75 978 L 75 980 L 76 981 L 76 982 L 77 982 L 78 983 L 78 984 L 80 986 L 82 986 L 83 985 L 83 984 L 84 983 L 85 983 L 85 982 L 86 981 L 87 981 L 87 980 L 88 979 L 90 979 L 91 978 L 93 978 L 93 977 L 94 976 L 96 976 L 97 975 Z" />
+            <path class="suit-cell" data-cell="8" d="M 431 972 L 431 974 L 430 975 L 430 979 L 429 980 L 429 983 L 428 984 L 428 991 L 426 994 L 426 998 L 425 999 L 425 1003 L 424 1004 L 424 1008 L 423 1009 L 423 1013 L 422 1014 L 422 1023 L 538 1023 L 538 1017 L 536 1015 L 536 1010 L 534 1007 L 534 1003 L 533 1002 L 533 1000 L 530 1000 L 529 999 L 528 999 L 527 998 L 527 996 L 526 995 L 525 995 L 523 993 L 522 993 L 520 991 L 519 991 L 516 988 L 513 987 L 511 985 L 510 985 L 508 983 L 507 983 L 506 982 L 503 982 L 501 979 L 500 979 L 493 975 L 490 975 L 488 973 L 487 973 L 486 972 L 483 972 L 482 971 L 480 971 L 479 970 L 475 970 L 474 969 L 469 969 L 468 968 L 447 968 L 446 969 L 438 969 L 437 970 L 433 970 L 433 971 L 432 972 Z" />
+            <path class="suit-cell" data-cell="9" d="M 626 960 L 625 961 L 625 963 L 624 964 L 624 965 L 623 966 L 622 966 L 622 967 L 621 968 L 621 969 L 620 970 L 620 978 L 621 979 L 621 982 L 623 984 L 623 989 L 624 990 L 624 992 L 626 994 L 626 998 L 627 999 L 627 1000 L 629 1002 L 629 1003 L 630 1004 L 630 1008 L 631 1009 L 631 1010 L 632 1011 L 632 1013 L 633 1014 L 633 1015 L 634 1016 L 634 1017 L 635 1018 L 635 1019 L 637 1019 L 639 1017 L 639 1016 L 640 1015 L 640 1014 L 641 1013 L 642 1013 L 643 1012 L 643 1009 L 644 1008 L 647 1008 L 655 1000 L 655 997 L 654 996 L 654 995 L 651 992 L 651 991 L 650 991 L 648 989 L 648 987 L 646 987 L 645 986 L 645 983 L 644 983 L 643 982 L 641 982 L 640 981 L 641 980 L 641 977 L 639 975 L 639 974 L 638 973 L 638 972 L 636 970 L 636 969 L 635 969 L 634 968 L 634 966 L 633 965 L 633 964 L 631 962 L 631 961 L 630 960 Z" />
+            <path class="suit-cell" data-cell="10" d="M 291 974 L 291 976 L 293 977 L 301 977 L 302 978 L 308 978 L 309 979 L 313 979 L 314 980 L 317 980 L 318 981 L 322 981 L 323 982 L 325 982 L 326 983 L 329 983 L 330 984 L 332 984 L 336 986 L 340 986 L 341 987 L 343 987 L 344 989 L 348 991 L 350 991 L 353 993 L 357 993 L 358 995 L 360 996 L 362 996 L 363 998 L 375 1004 L 377 1007 L 380 1007 L 383 1011 L 385 1012 L 387 1012 L 389 1015 L 391 1015 L 395 1020 L 397 1020 L 398 1019 L 399 1020 L 399 1023 L 411 1023 L 411 1021 L 412 1020 L 412 1016 L 413 1015 L 413 1012 L 414 1011 L 414 1007 L 415 1006 L 415 1001 L 416 1000 L 416 997 L 417 996 L 417 993 L 416 992 L 417 991 L 417 987 L 418 986 L 418 983 L 420 980 L 420 977 L 419 976 L 421 974 L 421 972 L 420 971 L 420 968 L 414 963 L 412 963 L 410 960 L 409 960 L 404 956 L 401 955 L 399 953 L 394 951 L 392 949 L 386 946 L 384 946 L 375 941 L 373 941 L 372 940 L 370 940 L 366 938 L 363 938 L 359 936 L 356 936 L 355 935 L 348 935 L 345 933 L 337 933 L 336 932 L 325 932 L 324 933 L 320 933 L 320 935 L 316 938 L 315 940 L 315 942 L 313 944 L 312 944 L 312 945 L 309 948 L 306 954 L 303 957 L 303 959 L 300 961 L 299 963 L 299 965 L 298 966 L 296 966 L 295 968 L 295 970 L 293 972 L 293 973 Z" />
+            <path class="suit-cell" data-cell="11" d="M 614 928 L 614 929 L 613 930 L 613 936 L 614 937 L 614 946 L 615 947 L 615 952 L 617 954 L 617 957 L 619 957 L 619 956 L 620 955 L 620 953 L 621 952 L 624 952 L 624 948 L 623 947 L 623 945 L 622 944 L 622 941 L 621 940 L 621 937 L 620 937 L 619 936 L 620 935 L 620 933 L 619 932 L 619 929 L 618 928 Z" />
+            <path class="suit-cell" data-cell="12" d="M 273 980 L 270 973 L 268 972 L 267 969 L 265 967 L 265 965 L 261 959 L 255 953 L 255 952 L 254 952 L 253 950 L 251 950 L 246 944 L 235 936 L 229 933 L 225 933 L 224 934 L 223 933 L 223 930 L 212 926 L 209 926 L 208 925 L 204 925 L 203 924 L 194 924 L 193 923 L 182 923 L 171 929 L 170 931 L 167 931 L 164 933 L 162 936 L 160 936 L 158 939 L 156 939 L 150 944 L 146 946 L 144 949 L 142 949 L 135 954 L 135 955 L 132 957 L 131 959 L 128 959 L 124 963 L 123 963 L 120 967 L 116 968 L 112 973 L 108 974 L 104 977 L 99 983 L 96 983 L 94 987 L 91 987 L 88 989 L 86 992 L 86 997 L 88 1000 L 88 1002 L 91 1009 L 92 1016 L 111 1016 L 114 1014 L 119 1013 L 120 1011 L 121 1012 L 124 1012 L 131 1009 L 134 1009 L 136 1007 L 139 1007 L 140 1006 L 141 1007 L 144 1007 L 150 1004 L 155 1005 L 156 1004 L 166 1004 L 167 1003 L 179 1003 L 180 1004 L 190 1004 L 191 1003 L 194 1005 L 201 1004 L 202 1006 L 204 1006 L 205 1005 L 208 1007 L 215 1007 L 216 1008 L 226 1009 L 227 1010 L 231 1010 L 232 1009 L 233 1011 L 235 1011 L 236 1010 L 238 1012 L 243 1012 L 244 1011 L 246 1011 L 248 1008 L 251 1007 L 251 1005 L 252 1004 L 255 1004 L 255 1002 L 256 1001 L 258 1001 L 258 999 L 259 998 L 261 998 L 261 996 L 263 995 L 269 989 L 270 986 L 272 985 Z" />
+            <path class="suit-cell" data-cell="13" d="M 606 929 L 603 929 L 602 928 L 596 928 L 595 927 L 593 927 L 590 925 L 588 925 L 586 923 L 585 923 L 584 922 L 583 922 L 582 921 L 581 921 L 579 919 L 578 919 L 577 918 L 576 918 L 573 915 L 572 915 L 571 914 L 566 914 L 565 915 L 564 915 L 564 916 L 563 917 L 560 917 L 557 920 L 556 920 L 549 927 L 548 927 L 548 928 L 543 933 L 543 934 L 542 935 L 542 981 L 543 982 L 543 984 L 545 984 L 546 983 L 547 983 L 552 978 L 553 978 L 556 975 L 557 975 L 558 974 L 559 974 L 559 973 L 560 972 L 563 972 L 564 971 L 565 971 L 566 970 L 567 970 L 570 968 L 572 968 L 573 967 L 575 967 L 576 966 L 579 966 L 581 963 L 582 964 L 601 964 L 602 965 L 608 965 L 608 963 L 609 962 L 609 959 L 608 958 L 608 950 L 607 949 L 607 938 L 606 937 Z" />
+            <path class="suit-cell" data-cell="14" d="M 442 913 L 442 918 L 441 919 L 441 927 L 439 930 L 439 935 L 438 936 L 438 940 L 437 941 L 437 945 L 436 946 L 436 951 L 435 952 L 435 957 L 434 958 L 434 960 L 436 960 L 437 961 L 439 961 L 439 960 L 440 959 L 441 960 L 454 960 L 455 959 L 456 960 L 472 960 L 473 961 L 477 961 L 478 962 L 482 962 L 483 963 L 486 963 L 487 964 L 491 964 L 492 965 L 495 965 L 496 966 L 496 967 L 497 967 L 498 968 L 502 968 L 504 970 L 504 971 L 507 971 L 508 972 L 508 973 L 510 973 L 511 972 L 512 973 L 512 975 L 515 976 L 520 980 L 521 980 L 522 981 L 524 981 L 525 982 L 525 983 L 528 986 L 531 986 L 532 985 L 532 984 L 533 983 L 533 960 L 534 959 L 534 936 L 533 935 L 532 932 L 527 927 L 527 926 L 525 924 L 524 924 L 520 920 L 519 920 L 514 916 L 513 916 L 510 914 L 507 914 L 506 913 L 506 912 L 505 912 L 504 911 L 502 911 L 501 910 L 499 910 L 498 909 L 496 909 L 495 908 L 493 908 L 492 907 L 488 907 L 487 906 L 481 906 L 480 905 L 468 905 L 467 906 L 459 906 L 458 907 L 455 907 L 454 908 L 451 908 L 450 909 L 448 909 L 447 910 L 444 911 Z" />
+            <path class="suit-cell" data-cell="15" d="M 543 896 L 543 903 L 544 904 L 544 905 L 543 906 L 543 911 L 542 912 L 542 919 L 543 920 L 546 920 L 547 919 L 547 917 L 548 916 L 549 916 L 549 915 L 550 914 L 553 914 L 553 913 L 554 912 L 556 912 L 557 911 L 557 904 L 554 904 L 553 903 L 552 903 L 551 902 L 551 900 L 550 900 L 549 899 L 548 899 L 547 898 L 547 897 L 546 896 Z" />
+            <path class="suit-cell" data-cell="16" d="M 201 913 L 201 915 L 203 915 L 204 916 L 207 916 L 208 917 L 210 917 L 211 918 L 213 918 L 214 919 L 216 919 L 217 920 L 219 920 L 224 923 L 229 923 L 231 925 L 231 926 L 232 927 L 234 927 L 236 929 L 237 929 L 239 931 L 240 931 L 243 933 L 245 933 L 246 932 L 247 933 L 247 936 L 250 937 L 252 939 L 252 940 L 253 941 L 255 941 L 256 942 L 256 943 L 257 943 L 258 944 L 258 945 L 261 948 L 262 948 L 263 949 L 263 950 L 264 951 L 265 951 L 267 953 L 267 954 L 268 954 L 269 955 L 269 957 L 273 961 L 274 961 L 275 962 L 275 964 L 278 964 L 279 965 L 279 967 L 280 968 L 280 970 L 283 970 L 283 969 L 285 967 L 286 967 L 286 965 L 287 964 L 288 964 L 292 960 L 292 957 L 293 956 L 294 956 L 295 953 L 296 952 L 297 952 L 299 950 L 299 949 L 300 948 L 300 946 L 303 944 L 304 941 L 306 939 L 306 936 L 309 933 L 309 929 L 308 928 L 307 928 L 305 926 L 305 924 L 300 919 L 299 919 L 295 914 L 293 914 L 293 915 L 292 916 L 291 915 L 291 911 L 290 911 L 289 910 L 289 908 L 287 908 L 286 909 L 285 908 L 285 906 L 282 903 L 281 903 L 279 901 L 278 901 L 277 900 L 276 900 L 269 896 L 267 896 L 266 895 L 264 895 L 263 894 L 261 894 L 260 893 L 256 893 L 255 892 L 251 892 L 250 893 L 248 893 L 247 892 L 245 892 L 244 893 L 243 892 L 240 892 L 238 895 L 235 895 L 234 896 L 231 897 L 231 898 L 230 899 L 227 899 L 226 900 L 225 900 L 223 903 L 220 903 L 219 904 L 216 905 L 216 907 L 215 908 L 214 907 L 212 907 L 210 909 L 209 909 L 208 910 L 207 910 L 206 911 Z" />
+            <path class="suit-cell" data-cell="17" d="M 352 877 L 351 878 L 351 879 L 350 880 L 349 880 L 349 884 L 348 885 L 347 885 L 347 886 L 346 887 L 346 889 L 344 892 L 344 894 L 343 895 L 343 896 L 342 897 L 342 898 L 341 899 L 338 906 L 336 908 L 335 911 L 333 913 L 333 914 L 332 915 L 332 917 L 329 919 L 329 923 L 330 923 L 331 924 L 331 925 L 342 925 L 343 926 L 349 926 L 350 927 L 354 927 L 355 928 L 358 928 L 359 929 L 361 929 L 362 930 L 367 930 L 369 932 L 374 932 L 380 936 L 384 936 L 385 937 L 387 937 L 388 938 L 388 939 L 389 939 L 390 940 L 392 940 L 393 941 L 398 943 L 400 945 L 402 945 L 403 946 L 404 946 L 406 948 L 411 950 L 413 952 L 416 952 L 418 955 L 423 956 L 424 955 L 424 952 L 425 951 L 426 951 L 426 948 L 427 947 L 427 944 L 428 943 L 428 939 L 429 938 L 429 931 L 430 930 L 431 930 L 431 926 L 432 925 L 432 921 L 433 920 L 433 916 L 434 915 L 434 913 L 433 912 L 435 909 L 435 907 L 434 906 L 434 905 L 431 903 L 431 901 L 430 900 L 430 899 L 428 897 L 428 896 L 424 892 L 421 892 L 420 891 L 419 891 L 418 890 L 419 889 L 419 887 L 418 887 L 415 884 L 414 884 L 413 883 L 413 882 L 411 882 L 410 881 L 410 880 L 409 880 L 407 878 L 406 878 L 403 876 L 401 876 L 400 875 L 396 875 L 391 872 L 369 872 L 368 873 L 363 873 L 362 874 L 359 874 L 358 875 L 356 875 L 355 876 Z" />
+            <path class="suit-cell" data-cell="18" d="M 308 846 L 307 847 L 307 848 L 305 850 L 305 851 L 301 855 L 300 854 L 295 854 L 293 856 L 293 857 L 289 861 L 288 861 L 287 862 L 287 863 L 285 865 L 283 865 L 282 866 L 282 868 L 281 869 L 279 869 L 279 870 L 278 871 L 275 871 L 273 873 L 272 873 L 272 874 L 270 876 L 269 876 L 268 877 L 265 877 L 263 879 L 262 879 L 261 880 L 260 880 L 259 881 L 258 881 L 258 883 L 260 885 L 262 885 L 263 886 L 266 886 L 267 887 L 271 887 L 272 888 L 272 889 L 273 889 L 274 890 L 276 890 L 277 891 L 280 891 L 282 894 L 283 894 L 286 896 L 288 896 L 290 899 L 291 899 L 295 903 L 296 903 L 300 907 L 301 907 L 307 913 L 309 913 L 311 915 L 311 917 L 312 918 L 314 918 L 316 920 L 318 920 L 319 919 L 319 917 L 320 916 L 321 916 L 321 914 L 322 913 L 323 913 L 323 912 L 324 911 L 325 911 L 325 908 L 326 907 L 327 907 L 327 905 L 330 903 L 330 900 L 331 899 L 331 898 L 332 897 L 332 896 L 333 895 L 334 895 L 334 894 L 335 893 L 335 891 L 336 890 L 336 888 L 338 885 L 338 880 L 339 879 L 339 874 L 338 873 L 338 872 L 337 871 L 336 871 L 334 869 L 334 867 L 332 865 L 332 864 L 331 863 L 330 863 L 329 862 L 329 861 L 322 854 L 321 854 L 320 853 L 320 852 L 319 852 L 318 851 L 317 851 L 316 850 L 316 849 L 315 848 L 314 848 L 312 846 Z" />
+            <path class="suit-cell" data-cell="19" d="M 456 831 L 455 832 L 455 834 L 454 835 L 454 840 L 453 841 L 453 845 L 454 846 L 454 847 L 452 849 L 452 856 L 451 857 L 451 862 L 450 863 L 450 868 L 449 869 L 449 875 L 448 876 L 448 881 L 447 882 L 447 888 L 446 889 L 446 894 L 445 895 L 445 899 L 449 899 L 450 900 L 452 900 L 453 899 L 458 899 L 459 898 L 485 898 L 486 899 L 491 899 L 492 900 L 496 900 L 497 901 L 499 901 L 500 902 L 502 902 L 505 904 L 507 904 L 508 905 L 511 905 L 512 906 L 512 907 L 515 907 L 516 908 L 519 909 L 520 910 L 520 911 L 522 911 L 523 912 L 523 913 L 525 915 L 528 915 L 529 916 L 529 918 L 533 918 L 533 916 L 534 915 L 534 910 L 535 909 L 535 892 L 534 891 L 534 888 L 531 885 L 528 885 L 527 884 L 527 882 L 524 882 L 523 881 L 523 880 L 520 877 L 519 877 L 510 869 L 509 869 L 507 867 L 506 867 L 502 863 L 500 863 L 496 858 L 495 858 L 492 855 L 491 855 L 486 850 L 485 850 L 482 847 L 481 847 L 480 846 L 477 846 L 476 845 L 476 842 L 475 841 L 474 841 L 469 836 L 468 836 L 466 834 L 464 834 L 463 833 L 463 832 L 461 832 L 460 831 Z" />
+            <path class="suit-cell" data-cell="20" d="M 369 799 L 368 800 L 368 802 L 367 803 L 367 807 L 366 808 L 366 813 L 365 814 L 365 818 L 364 819 L 364 823 L 365 824 L 364 825 L 363 825 L 363 828 L 362 829 L 362 833 L 361 834 L 361 838 L 360 839 L 360 842 L 359 843 L 359 847 L 358 848 L 358 851 L 357 852 L 357 854 L 358 855 L 357 856 L 356 856 L 356 859 L 355 860 L 355 863 L 354 864 L 354 866 L 358 866 L 359 865 L 363 865 L 364 864 L 367 864 L 368 863 L 391 863 L 392 864 L 394 864 L 395 865 L 397 865 L 398 866 L 403 867 L 405 869 L 406 869 L 407 870 L 410 871 L 412 873 L 413 873 L 416 876 L 418 876 L 418 875 L 419 874 L 420 875 L 420 879 L 427 886 L 428 886 L 431 889 L 433 889 L 434 890 L 434 893 L 436 893 L 437 892 L 437 890 L 439 887 L 439 882 L 440 881 L 440 875 L 441 874 L 441 868 L 442 867 L 442 862 L 443 861 L 443 855 L 444 854 L 444 848 L 445 847 L 445 844 L 444 843 L 445 842 L 445 839 L 446 838 L 446 836 L 445 835 L 446 834 L 446 829 L 445 829 L 444 828 L 444 827 L 443 826 L 443 824 L 440 821 L 439 821 L 438 820 L 438 818 L 436 818 L 435 817 L 435 816 L 432 813 L 431 813 L 429 811 L 427 811 L 425 808 L 424 808 L 420 805 L 419 805 L 414 802 L 412 802 L 407 799 L 404 799 L 403 798 L 400 798 L 399 797 L 394 797 L 393 796 L 388 796 L 387 797 L 382 797 L 381 796 L 379 796 L 378 797 L 374 797 L 373 798 L 371 798 L 370 799 Z" />
+            <path class="suit-cell" data-cell="21" d="M 329 769 L 329 772 L 328 773 L 328 775 L 327 776 L 327 786 L 326 787 L 326 797 L 325 798 L 325 807 L 324 808 L 324 810 L 325 811 L 325 812 L 323 814 L 323 821 L 322 822 L 321 822 L 321 823 L 320 824 L 320 826 L 319 827 L 319 828 L 318 829 L 318 830 L 316 833 L 316 836 L 317 836 L 318 837 L 318 839 L 321 842 L 322 842 L 325 845 L 325 846 L 326 846 L 328 848 L 328 849 L 329 850 L 330 850 L 333 853 L 333 854 L 334 855 L 334 856 L 338 860 L 340 860 L 341 861 L 341 864 L 343 864 L 344 863 L 345 863 L 345 860 L 346 859 L 346 856 L 347 855 L 347 850 L 348 849 L 348 846 L 349 845 L 350 845 L 350 842 L 351 841 L 351 838 L 352 837 L 352 834 L 353 833 L 353 830 L 354 829 L 354 825 L 355 824 L 355 821 L 356 820 L 356 816 L 357 815 L 357 812 L 358 811 L 358 808 L 359 807 L 359 797 L 358 796 L 358 795 L 356 792 L 356 790 L 354 788 L 354 787 L 351 784 L 351 783 L 343 775 L 342 775 L 340 773 L 339 773 L 337 771 L 336 771 L 333 769 Z" />
+            <path class="suit-cell" data-cell="22" d="M 375 757 L 375 761 L 374 762 L 374 767 L 373 768 L 373 774 L 372 775 L 372 780 L 371 781 L 371 788 L 373 788 L 374 789 L 395 789 L 396 790 L 398 790 L 399 789 L 401 791 L 404 791 L 405 792 L 407 792 L 408 793 L 413 793 L 414 794 L 414 795 L 417 795 L 418 794 L 418 792 L 417 792 L 412 787 L 409 787 L 408 786 L 408 783 L 405 780 L 404 780 L 397 773 L 395 773 L 394 774 L 393 773 L 393 770 L 379 756 L 377 756 L 376 757 Z" />
+            <path class="suit-cell" data-cell="23" d="M 333 712 L 333 713 L 332 714 L 332 718 L 333 719 L 332 720 L 332 727 L 331 728 L 331 734 L 332 735 L 331 736 L 331 739 L 330 740 L 330 751 L 329 752 L 329 756 L 330 757 L 330 760 L 332 760 L 333 761 L 334 761 L 335 762 L 336 762 L 337 763 L 338 763 L 340 765 L 341 765 L 344 768 L 345 768 L 348 771 L 350 771 L 352 773 L 352 775 L 354 775 L 355 776 L 355 777 L 356 777 L 358 779 L 358 782 L 360 784 L 360 785 L 361 786 L 363 786 L 363 782 L 364 781 L 364 776 L 365 775 L 365 773 L 364 772 L 364 771 L 366 769 L 366 765 L 367 764 L 367 758 L 368 757 L 368 752 L 369 751 L 369 749 L 368 748 L 368 746 L 367 745 L 367 744 L 366 744 L 360 738 L 360 737 L 359 736 L 358 736 L 356 734 L 356 733 L 354 731 L 353 731 L 351 729 L 351 728 L 343 720 L 342 720 L 340 718 L 340 717 L 339 717 L 338 716 L 338 715 L 337 715 L 336 714 L 336 713 L 335 712 Z" />
+        </g>
+
+        <!-- Layer 3: Live Cursor-Tracking Eyes & Under-Eye Stitched Scar -->
+        <g id="eyes-scar-rig">
+          <path id="left-eye" class="eye-shape eye-squint" d="M 423 508 L 423 509 L 428 509 L 429 510 L 435 510 L 436 511 L 442 511 L 443 512 L 449 512 L 450 513 L 457 513 L 458 514 L 465 514 L 466 515 L 473 515 L 474 516 L 482 516 L 483 517 L 491 517 L 492 518 L 500 518 L 501 519 L 511 519 L 512 520 L 521 520 L 522 521 L 533 521 L 534 522 L 543 522 L 544 523 L 554 523 L 555 524 L 569 524 L 570 525 L 599 525 L 600 526 L 602 526 L 600 520 L 598 518 L 598 517 L 597 516 L 597 515 L 595 513 L 594 510 L 591 507 L 591 506 L 588 503 L 588 502 L 580 494 L 580 493 L 578 491 L 577 491 L 571 485 L 570 485 L 567 482 L 566 482 L 564 480 L 563 480 L 558 476 L 557 476 L 556 475 L 553 474 L 551 472 L 550 472 L 549 471 L 547 471 L 546 470 L 545 470 L 542 468 L 540 468 L 539 467 L 537 467 L 536 466 L 534 466 L 533 465 L 530 465 L 529 464 L 525 464 L 524 463 L 520 463 L 519 462 L 504 462 L 503 461 L 502 461 L 501 462 L 488 462 L 487 463 L 481 463 L 480 464 L 477 464 L 476 465 L 473 465 L 472 466 L 470 466 L 469 467 L 467 467 L 464 469 L 462 469 L 461 470 L 460 470 L 459 471 L 456 472 L 454 474 L 453 474 L 451 476 L 450 476 L 448 478 L 447 478 L 443 482 L 442 482 L 435 489 L 435 490 L 430 495 L 429 498 L 427 500 L 427 501 L 426 502 L 426 503 L 425 504 L 425 505 Z" />
+          <path id="right-eye" class="eye-shape eye-squint" d="M 813 484 L 812 483 L 812 482 L 811 481 L 811 480 L 810 479 L 810 478 L 806 474 L 806 473 L 805 472 L 804 472 L 801 469 L 800 469 L 798 467 L 797 467 L 796 466 L 794 466 L 793 465 L 791 465 L 790 464 L 785 464 L 784 463 L 776 463 L 775 464 L 771 464 L 770 465 L 767 465 L 766 466 L 764 466 L 763 467 L 762 467 L 761 468 L 759 468 L 758 469 L 756 469 L 755 470 L 754 470 L 752 472 L 751 472 L 750 473 L 749 473 L 747 475 L 746 475 L 745 476 L 744 476 L 742 478 L 741 478 L 738 481 L 737 481 L 734 484 L 733 484 L 714 503 L 714 504 L 710 508 L 710 509 L 707 512 L 707 513 L 706 514 L 706 515 L 704 517 L 704 518 L 703 519 L 703 520 L 702 521 L 702 522 L 701 523 L 701 524 L 700 525 L 700 527 L 708 527 L 709 526 L 717 526 L 718 525 L 727 525 L 728 524 L 736 524 L 737 523 L 745 523 L 746 522 L 753 522 L 754 521 L 761 521 L 762 520 L 767 520 L 768 519 L 773 519 L 774 518 L 778 518 L 779 517 L 783 517 L 784 516 L 788 516 L 789 515 L 793 515 L 794 514 L 797 514 L 798 513 L 801 513 L 802 512 L 805 512 L 806 511 L 809 511 L 810 510 L 812 510 L 813 509 L 815 509 L 816 508 L 816 494 L 815 493 L 815 490 L 814 489 L 814 487 L 813 486 Z" />
+          <path id="scar-shape" d="M 714 567 L 716 567 L 717 568 L 719 568 L 720 569 L 724 569 L 725 570 L 729 570 L 730 571 L 735 571 L 736 572 L 744 572 L 745 573 L 748 573 L 750 575 L 750 576 L 751 577 L 751 580 L 752 581 L 752 583 L 753 584 L 753 587 L 754 588 L 754 589 L 754 582 L 755 581 L 755 576 L 756 575 L 756 573 L 758 571 L 761 571 L 762 570 L 768 570 L 769 569 L 773 569 L 774 568 L 777 568 L 778 567 L 780 567 L 781 566 L 784 566 L 786 568 L 786 569 L 787 570 L 787 572 L 788 573 L 788 575 L 789 576 L 789 578 L 790 579 L 790 581 L 790 574 L 789 573 L 789 564 L 792 561 L 793 561 L 795 559 L 796 559 L 799 556 L 800 556 L 804 552 L 803 552 L 802 553 L 801 553 L 799 555 L 798 555 L 797 556 L 796 556 L 795 557 L 794 557 L 793 558 L 790 558 L 787 555 L 787 554 L 786 553 L 786 552 L 785 551 L 785 550 L 785 556 L 784 557 L 784 558 L 781 561 L 780 561 L 779 562 L 777 562 L 776 563 L 772 563 L 771 564 L 766 564 L 765 565 L 757 565 L 756 564 L 755 564 L 754 563 L 754 562 L 753 561 L 753 559 L 752 558 L 752 556 L 751 555 L 751 552 L 750 551 L 750 550 L 750 559 L 749 560 L 749 565 L 746 568 L 719 568 L 718 567 Z" />
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. SYNTHESIZED WEB AUDIO ENGINE (Haki Pulse, Web Thwip & Tactile Clicks)
+    // =========================================================================
+    let audioCtx = null;
+
+    function getAudio() {
+      if (!audioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) audioCtx = new AC();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+
+    function playTick(freq = 620, dur = 0.03) {
+      const ctx = getAudio();
+      if (!ctx) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.4, ctx.currentTime + dur);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + dur);
+    }
+
+    function playHakiBurstSound() {
+      const ctx = getAudio();
+      if (!ctx) return;
+      // Sub-bass impact + electric crackle sweep
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(135, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(34, ctx.currentTime + 0.42);
+      gain.gain.setValueAtTime(0.24, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.45);
+    }
+
+    function playWebThwipSound() {
+      const ctx = getAudio();
+      if (!ctx) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(320, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1480, ctx.currentTime + 0.09);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.11);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.11);
+    }
+
+    // =========================================================================
+    // 2. THREE.JS WEBGL 3D PARTICLE AURA & DEPTH FIELD
+    // =========================================================================
+    let webglParticlesMat = null;
+    function initWebGL() {
+      const canvas = document.getElementById('webgl-aura');
+      if (!window.THREE || !canvas) return;
+
+      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.z = 10;
+
+      const count = 95;
+      const geo = new THREE.BufferGeometry();
+      const pos = new Float32Array(count * 3);
+      const speeds = new Float32Array(count);
+      for (let i = 0; i < count; i++) {
+        pos[i * 3] = (Math.random() - 0.5) * 18;
+        pos[i * 3 + 1] = (Math.random() - 0.5) * 14;
+        pos[i * 3 + 2] = (Math.random() - 0.5) * 6;
+        speeds[i] = 0.008 + Math.random() * 0.018;
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+
+      webglParticlesMat = new THREE.PointsMaterial({
+        color: 0xff6b35,
+        size: 0.07,
+        transparent: true,
+        opacity: 0.35
+      });
+
+      const points = new THREE.Points(geo, webglParticlesMat);
+      scene.add(points);
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      function animateWebGL() {
+        requestAnimationFrame(animateWebGL);
+        const arr = geo.attributes.position.array;
+        const boost = (activeMode === 'overdrive' || isPointerDown) ? 3.5 : 1;
+        for (let i = 0; i < count; i++) {
+          arr[i * 3 + 1] += speeds[i] * boost;
+          if (arr[i * 3 + 1] > 7) arr[i * 3 + 1] = -7;
+        }
+        geo.attributes.position.needsUpdate = true;
+        points.rotation.y += 0.001 * boost;
+        renderer.render(scene, camera);
+      }
+      animateWebGL();
+    }
+
+    // =========================================================================
+    // 3. LIVE CURSOR GAZE TRACKING, 3D HEAD TILT & AUTONOMOUS BLINKING
+    // =========================================================================
+    const rigEl = document.getElementById('character-rig');
+    const eyesScarRig = document.getElementById('eyes-scar-rig');
+    const leftEye = document.getElementById('left-eye');
+    const rightEye = document.getElementById('right-eye');
+    const svgEl = document.getElementById('character-svg');
+
+    let targetEyeX = 0, targetEyeY = 0;
+    let curEyeX = 0, curEyeY = 0;
+    let targetRotX = 0, targetRotY = 0;
+    let curRotX = 0, curRotY = 0;
+    let isPointerDown = false;
+    let activeMode = 'overdrive'; // 'haki', 'web', 'overdrive', 'halftone'
+
+    function handlePointerMove(clientX, clientY) {
+      const nx = (clientX / window.innerWidth - 0.5) * 2;  // -1 to +1
+      const ny = (clientY / window.innerHeight - 0.5) * 2; // -1 to +1
+
+      // Eyes & scar shift inside the shadow face to look directly at the user's cursor
+      targetEyeX = nx * 28;
+      targetEyeY = ny * 20;
+
+      // Subtle 3D head & spiky hair perspective turn
+      targetRotY = nx * 8.5;
+      targetRotX = -ny * 6.5;
+    }
+
+    window.addEventListener('mousemove', (e) => {
+      handlePointerMove(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('touchmove', (e) => {
+      if (e.touches.length > 0) {
+        handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    }, { passive: true });
+
+    function updateRigPhysics() {
+      curEyeX += (targetEyeX - curEyeX) * 0.16;
+      curEyeY += (targetEyeY - curEyeY) * 0.16;
+      curRotX += (targetRotX - curRotX) * 0.12;
+      curRotY += (targetRotY - curRotY) * 0.12;
+
+      eyesScarRig.style.transform = `translate(${curEyeX.toFixed(2)}px, ${curEyeY.toFixed(2)}px)`;
+      rigEl.style.transform = `scale(1.04) rotateX(${(curRotX * 0.6).toFixed(2)}deg) rotateY(${(curRotY * 0.6).toFixed(2)}deg)`;
+      document.getElementById('portrait-stage').style.transform = `perspective(1000px) rotateX(${curRotX.toFixed(2)}deg) rotateY(${curRotY.toFixed(2)}deg)`;
+
+      requestAnimationFrame(updateRigPhysics);
+    }
+    updateRigPhysics();
+
+    // Natural Autonomous Eye Blinking Loop
+    function triggerBlink() {
+      if (!isPointerDown) {
+        leftEye.classList.add('eye-blink');
+        rightEye.classList.add('eye-blink');
+        setTimeout(() => {
+          leftEye.classList.remove('eye-blink');
+          rightEye.classList.remove('eye-blink');
+        }, 130);
+      }
+      setTimeout(triggerBlink, 2400 + Math.random() * 2800);
+    }
+    setTimeout(triggerBlink, 2000);
+
+    // Double-Click on Eyes/Stage for Playful Luffy Wink
+    document.getElementById('portrait-stage').addEventListener('dblclick', () => {
+      rightEye.classList.add('eye-blink');
+      leftEye.classList.add('eye-wide');
+      playTick(880, 0.08);
+      setTimeout(() => {
+        rightEye.classList.remove('eye-blink');
+        leftEye.classList.remove('eye-wide');
+      }, 420);
+    });
+
+    // Interactive Suit Web Cells Ripple on Hover & Click
+    const suitCells = document.querySelectorAll('.suit-cell');
+    suitCells.forEach((cell, idx) => {
+      cell.addEventListener('mouseenter', () => {
+        playTick(420 + (idx % 12) * 35, 0.018);
+      });
+      cell.addEventListener('click', (e) => {
+        e.stopPropagation();
+        playWebThwipSound();
+        // Ripple wave across all 24 suit web panels
+        suitCells.forEach((c, j) => {
+          setTimeout(() => {
+            c.classList.add('pulse-cell');
+            setTimeout(() => c.classList.remove('pulse-cell'), 260);
+          }, Math.abs(idx - j) * 28);
+        });
+      });
+    });
+
+    // =========================================================================
+    // 4. INTERACTIVE 2D FX ENGINE (Haki Lightning Bolts, Spider-Sense & Webs)
+    // =========================================================================
+    const fxCanvas = document.getElementById('fx-canvas');
+    const fxCtx = fxCanvas.getContext('2d');
+    const lightningBolts = [];
+    const shockwaves = [];
+    const webStrands = [];
+
+    function resizeFxCanvas() {
+      fxCanvas.width = window.innerWidth;
+      fxCanvas.height = window.innerHeight;
+    }
+    resizeFxCanvas();
+    window.addEventListener('resize', resizeFxCanvas);
+
+    // Get screen coordinates of the character's eyes for spawning lightning/spider-sense
+    function getEyeScreenCenters() {
+      const lRect = leftEye.getBoundingClientRect();
+      const rRect = rightEye.getBoundingClientRect();
+      return {
+        left: { x: lRect.left + lRect.width / 2, y: lRect.top + lRect.height / 2 },
+        right: { x: rRect.left + rRect.width / 2, y: rRect.top + rRect.height / 2 },
+        mid: { x: (lRect.left + rRect.right) / 2, y: (lRect.top + rRect.bottom) / 2 }
+      };
+    }
+
+    function spawnHakiLightning(originX, originY, targetX, targetY, color) {
+      const segments = [];
+      let cx = originX;
+      let cy = originY;
+      const steps = 12;
+      const dx = (targetX - originX) / steps;
+      const dy = (targetY - originY) / steps;
+
+      for (let i = 1; i <= steps; i++) {
+        const jitter = (i === steps) ? 0 : (Math.random() - 0.5) * 48;
+        const nx = originX + dx * i + jitter;
+        const ny = originY + dy * i + jitter;
+        segments.push({ x1: cx, y1: cy, x2: nx, y2: ny });
+        cx = nx;
+        cy = ny;
+      }
+      lightningBolts.push({ segments, alpha: 1.0, color, width: 3.5 + Math.random() * 2.5 });
+    }
+
+    function triggerHakiBurst(clientX, clientY) {
+      const eyes = getEyeScreenCenters();
+      const st = getComputedStyle(document.documentElement);
+      const auraCol = st.getPropertyValue('--aura-color').trim() || '#ff2e43';
+      const eyeCol = st.getPropertyValue('--eye-color').trim() || '#ffffff';
+
+      // Bolts from both eyes toward cursor and outward
+      spawnHakiLightning(eyes.left.x, eyes.left.y, clientX, clientY, auraCol);
+      spawnHakiLightning(eyes.right.x, eyes.right.y, clientX, clientY, eyeCol);
+
+      for (let i = 0; i < 5; i++) {
+        const ang = (Math.PI * 2 * i) / 5 + Math.random() * 0.6;
+        const dist = 160 + Math.random() * 220;
+        spawnHakiLightning(
+          eyes.mid.x,
+          eyes.mid.y,
+          eyes.mid.x + Math.cos(ang) * dist,
+          eyes.mid.y + Math.sin(ang) * dist,
+          i % 2 === 0 ? auraCol : '#050507'
+        );
+      }
+
+      shockwaves.push({ x: eyes.mid.x, y: eyes.mid.y, r: 20, maxR: 280, alpha: 0.85, color: auraCol });
+      playHakiBurstSound();
+    }
+
+    function shootSpiderWeb(targetX, targetY) {
+      const eyes = getEyeScreenCenters();
+      const startX = eyes.mid.x;
+      const startY = eyes.mid.y + 180; // Launches from lower neck/shoulder
+      webStrands.push({
+        x1: startX,
+        y1: startY,
+        x2: targetX,
+        y2: targetY,
+        progress: 0,
+        alpha: 1.0
+      });
+      playWebThwipSound();
+    }
+
+    // Mouse / Touch Down Interaction
+    window.addEventListener('mousedown', (e) => {
+      if (e.target.closest('#glyph-hamburger') || e.target.closest('#customizer-pod')) return;
+      isPointerDown = true;
+      rigEl.classList.add('haki-active');
+      leftEye.classList.add('eye-squint');
+      rightEye.classList.add('eye-squint');
+
+      if (activeMode === 'web') {
+        shootSpiderWeb(e.clientX, e.clientY);
+      } else {
+        triggerHakiBurst(e.clientX, e.clientY);
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      isPointerDown = false;
+      if (activeMode !== 'overdrive') {
+        rigEl.classList.remove('haki-active');
+        leftEye.classList.remove('eye-squint');
+        rightEye.classList.remove('eye-squint');
+      }
+    });
+
+    // Render loop for 2D FX Canvas
+    let frameCount = 0;
+    function renderFxLoop() {
+      fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+      frameCount++;
+
+      // Continuous ambient Haki lightning in Overdrive mode
+      if (activeMode === 'overdrive' && frameCount % 9 === 0) {
+        const eyes = getEyeScreenCenters();
+        const st = getComputedStyle(document.documentElement);
+        const auraCol = st.getPropertyValue('--aura-color').trim() || '#ff2e43';
+        const ang = Math.random() * Math.PI * 2;
+        const dist = 120 + Math.random() * 180;
+        const src = Math.random() > 0.5 ? eyes.left : eyes.right;
+        spawnHakiLightning(src.x, src.y, src.x + Math.cos(ang) * dist, src.y + Math.sin(ang) * dist, auraCol);
+      }
+
+      // Draw Shockwave Rings (Spider-Sense / Haki)
+      for (let i = shockwaves.length - 1; i >= 0; i--) {
+        const sw = shockwaves[i];
+        sw.r += (sw.maxR - sw.r) * 0.14;
+        sw.alpha *= 0.91;
+        if (sw.alpha < 0.02) {
+          shockwaves.splice(i, 1);
+          continue;
+        }
+        fxCtx.save();
+        fxCtx.beginPath();
+        fxCtx.arc(sw.x, sw.y, sw.r, 0, Math.PI * 2);
+        fxCtx.strokeStyle = sw.color;
+        fxCtx.globalAlpha = sw.alpha;
+        fxCtx.lineWidth = 3;
+        fxCtx.stroke();
+        fxCtx.restore();
+      }
+
+      // Draw Conqueror's Haki Lightning Bolts
+      for (let i = lightningBolts.length - 1; i >= 0; i--) {
+        const b = lightningBolts[i];
+        b.alpha *= 0.86;
+        if (b.alpha < 0.03) {
+          lightningBolts.splice(i, 1);
+          continue;
+        }
+        fxCtx.save();
+        fxCtx.globalAlpha = b.alpha;
+        fxCtx.strokeStyle = b.color;
+        fxCtx.shadowColor = b.color;
+        fxCtx.shadowBlur = 16;
+        fxCtx.lineWidth = b.width;
+        fxCtx.lineCap = 'round';
+        fxCtx.beginPath();
+        b.segments.forEach((seg) => {
+          fxCtx.moveTo(seg.x1, seg.y1);
+          fxCtx.lineTo(seg.x2, seg.y2);
+        });
+        fxCtx.stroke();
+        fxCtx.restore();
+      }
+
+      // Draw Interactive Spider-Web Strands
+      for (let i = webStrands.length - 1; i >= 0; i--) {
+        const ws = webStrands[i];
+        ws.progress = Math.min(1, ws.progress + 0.18);
+        ws.alpha *= 0.985;
+        if (ws.alpha < 0.03) {
+          webStrands.splice(i, 1);
+          continue;
+        }
+        const curX = ws.x1 + (ws.x2 - ws.x1) * ws.progress;
+        const curY = ws.y1 + (ws.y2 - ws.y1) * ws.progress;
+
+        fxCtx.save();
+        fxCtx.globalAlpha = ws.alpha;
+        fxCtx.strokeStyle = '#ffffff';
+        fxCtx.lineWidth = 2.2;
+        fxCtx.beginPath();
+        fxCtx.moveTo(ws.x1, ws.y1);
+        fxCtx.lineTo(curX, curY);
+        fxCtx.stroke();
+
+        // Web anchor node at target when fully extended
+        if (ws.progress >= 1) {
+          for (let r = 8; r <= 24; r += 8) {
+            fxCtx.beginPath();
+            fxCtx.arc(ws.x2, ws.y2, r, 0, Math.PI * 2);
+            fxCtx.lineWidth = 1.2;
+            fxCtx.stroke();
+          }
+        }
+        fxCtx.restore();
+      }
+
+      requestAnimationFrame(renderFxLoop);
+    }
+    renderFxLoop();
+
+    // =========================================================================
+    // 5. UNIQUE 3x3 GLYPH HAMBURGER & 5-COLOR / MODE CUSTOMIZER LOGIC
+    // =========================================================================
+    const hamBtn = document.getElementById('glyph-hamburger');
+    const podEl = document.getElementById('customizer-pod');
+
+    hamBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = podEl.classList.toggle('active');
+      hamBtn.classList.toggle('open', open);
+      playTick(open ? 780 : 480);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!podEl.contains(e.target) && !hamBtn.contains(e.target)) {
+        podEl.classList.remove('active');
+        hamBtn.classList.remove('open');
+      }
+    });
+
+    // 1. BG Swatches (Limit 5)
+    document.querySelectorAll('#bg-swatches .color-swatch').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#bg-swatches .color-swatch').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        document.documentElement.style.setProperty('--bg-color', btn.dataset.bg);
+        playTick(620);
+      });
+    });
+
+    // 2. Suit Swatches (Limit 5)
+    document.querySelectorAll('#suit-swatches .color-swatch').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#suit-swatches .color-swatch').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        document.documentElement.style.setProperty('--suit-color', btn.dataset.suit);
+        playTick(680);
+      });
+    });
+
+    // 3. Eye & Scar Glow Swatches (Limit 5)
+    document.querySelectorAll('#eye-swatches .color-swatch').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#eye-swatches .color-swatch').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        document.documentElement.style.setProperty('--eye-color', btn.dataset.eye);
+        document.documentElement.style.setProperty('--aura-color', btn.dataset.aura);
+        if (webglParticlesMat) {
+          webglParticlesMat.color.set(btn.dataset.eye);
+        }
+        playTick(740);
+      });
+    });
+
+    // 4. Interactive Mode Buttons
+    document.querySelectorAll('#mode-buttons .mode-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('#mode-buttons .mode-chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+        activeMode = chip.dataset.mode;
+
+        document.body.classList.remove('mode-overdrive', 'mode-halftone');
+        leftEye.classList.remove('eye-squint');
+        rightEye.classList.remove('eye-squint');
+
+        if (activeMode === 'overdrive') {
+          document.body.classList.add('mode-overdrive');
+          leftEye.classList.add('eye-squint');
+          rightEye.classList.add('eye-squint');
+          playHakiBurstSound();
+        } else if (activeMode === 'halftone') {
+          document.body.classList.add('mode-halftone');
+          playTick(700);
+        } else {
+          playTick(650);
+        }
+      });
+    });
+
+    window.onload = () => {
+      initWebGL();
+    };
+  </script>
+</body>
+</html>
