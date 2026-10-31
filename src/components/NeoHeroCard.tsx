@@ -569,7 +569,7 @@ export default function NeoHeroCard({ onOpenProject }: NeoHeroCardProps) {
                   <span className="text-xs font-bold font-mono ml-1">Live HTML Labs Showcase</span>
                 </div>
                 <span className="text-[11px] font-semibold bg-[#FFE66D] border border-black px-2 py-0.5 rounded-full">
-                  6 Interactive Projects
+                  {PROJECTS.length} Interactive Projects
                 </span>
               </div>
 

@@ -52,7 +52,7 @@ export default function AddProjectModal({ isOpen, onClose }: AddProjectModalProp
               <FolderPlus size={18} />
             </span>
             <h3 className="font-display font-extrabold text-base md:text-lg text-black">
-              How to Add Project #7 & Beyond
+              How to Add Project #8 & Beyond
             </h3>
           </div>
           <button

@@ -133,4 +133,23 @@ export const PROJECTS: ProjectItem[] = [
       tech: "Three.js / Canvas 2D / Audio",
     },
   },
+  {
+    id: "spider-line-silhouette",
+    title: "Spider-Line Silhouette WebGL",
+    shortTitle: "Spider Silhouette",
+    tagline: "Climbing Spider-Man, suspended Gwen, Brooklyn Bridge & physics web line",
+    category: "Interactive 3D Silhouette",
+    description: "An interactive Three.js silhouette scene featuring Spider-Man climbing a dynamic physics web line beneath a spider-eye emblem, suspended Gwen Stacy, tactile wind gusts, and day/night scene shader.",
+    path: "/elements/spider_line_silhouette.html",
+    tags: ["Three.js", "WebGL", "Spider-Man", "Silhouette", "Physics Web"],
+    themeColor: "#FF5E5B",
+    badgeColor: "#FFE66D",
+    icon: "shield",
+    featured: true,
+    stats: {
+      widgets: 4,
+      fps: "60 FPS",
+      tech: "Three.js / WebGL / Physics",
+    },
+  },
 ];

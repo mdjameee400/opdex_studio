@@ -23,7 +23,7 @@ interface ProjectShowcaseProps {
 export default function ProjectShowcase({ onOpenProject, onAddNewProject }: ProjectShowcaseProps) {
   const [activeCategory, setActiveCategory] = useState<string>("All");
 
-  const categories = ["All", "3D WebGL", "Interactive 3D Portrait", "Interactive Creature Lab", "Interface System", "Hardware Design Lab", "Retro 3D Game Station"];
+  const categories = ["All", "3D WebGL", "Interactive 3D Portrait", "Interactive 3D Silhouette", "Interactive Creature Lab", "Interface System", "Hardware Design Lab", "Retro 3D Game Station"];
 
   const filteredProjects = activeCategory === "All"
     ? PROJECTS
@@ -46,7 +46,7 @@ export default function ProjectShowcase({ onOpenProject, onAddNewProject }: Proj
             Integrated Project Labs
           </h2>
           <p className="text-sm md:text-base text-black/70 max-w-xl mt-1">
-            6 standalone, high-performance web applications embedded directly into your workspace. Launch them live, test them in responsive device frames, or open in full resolution.
+            {PROJECTS.length} standalone, high-performance web applications embedded directly into your workspace. Launch them live, test them in responsive device frames, or open in full resolution.
           </p>
         </div>
 

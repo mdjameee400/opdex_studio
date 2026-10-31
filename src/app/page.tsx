@@ -135,6 +135,21 @@ export default function OpdexLandingPage() {
       iconChar: "🐱",
       stats: "7 Tooth Keys · Claw FX",
     },
+    {
+      id: "spider-line-silhouette",
+      name: "Spider-Line Silhouette",
+      badge: "#07",
+      category: "3d",
+      categoryLabel: "3D Silhouette Lab",
+      tagColor: "bg-pastel-coral",
+      headerBg: "bg-[#101113]",
+      btnColor: "bg-pastel-coral",
+      desc: "Interactive Three.js silhouette scene with physics web line, Spider-Man climber, Gwen Stacy, Brooklyn Bridge & Day/Night mode.",
+      elementFile: "/elements/spider_line_silhouette.html",
+      image: "/elements/thumbnails/spider_line_silhouette.png",
+      iconChar: "🕸️",
+      stats: "Three.js · Physics Web · Day/Night",
+    },
   ];
 
   const handleGravityChange = (val: number) => {
@@ -209,7 +224,7 @@ export default function OpdexLandingPage() {
   const filteredArtifacts = artifacts.filter((art) => {
     const matchesFilter = activeFilter === "all" || 
                           art.category === activeFilter ||
-                          (activeFilter === "shaders" && (art.id === "interactive-spidy" || art.id === "hello-cat" || art.id === "ox-ui"));
+                          (activeFilter === "shaders" && (art.id === "interactive-spidy" || art.id === "hello-cat" || art.id === "ox-ui" || art.id === "spider-line-silhouette"));
     const matchesSearch = art.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           art.desc.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
@@ -726,6 +741,7 @@ export default function OpdexLandingPage() {
                       { uid: "#04", label: "GameBoy 3D", color: "bg-pastel-purple" },
                       { uid: "#05", label: "Spider-Luffy", color: "bg-pastel-coral" },
                       { uid: "#06", label: "Grin Cat", color: "bg-pastel-yellow" },
+                      { uid: "#07", label: "Spider-Line", color: "bg-pastel-coral" },
                     ].map((item) => (
                       <button
                         key={item.uid}
